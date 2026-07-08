@@ -163,6 +163,7 @@ private fun ActivityDetailContent(
         item {
             MapboxRouteView(
                 routePoints = activity.route,
+                isLoading = state.routeLoading,
                 modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp),
             )
         }

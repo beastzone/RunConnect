@@ -46,6 +46,7 @@ import com.runconnect.app.ui.theme.HeartRate
 import com.runconnect.app.ui.theme.TealPrimary
 import com.runconnect.app.ui.theme.TextPrimary
 import com.runconnect.app.ui.theme.TextSecondary
+import com.runconnect.app.ui.theme.PurpleAccent
 import com.runconnect.app.ui.theme.ZoneAerobic
 import com.runconnect.app.ui.theme.ZoneEasy
 import com.runconnect.app.ui.theme.ZoneMax
@@ -118,6 +119,20 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = hiltViewModel()) {
                         Spacer(Modifier.height(10.dp))
                         RestingHrChart(
                             data = state.restingHrHistory,
+                            modifier = Modifier.fillMaxWidth().height(110.dp),
+                        )
+                    }
+                }
+            }
+
+            // HRV trend (from dedicated HeartRateVariabilityRmssdRecord)
+            if (state.hrvHistory.size >= 3) {
+                item {
+                    Column(modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp)) {
+                        SectionHeader("HRV Trend (30 days)")
+                        Spacer(Modifier.height(10.dp))
+                        HrvChart(
+                            data = state.hrvHistory,
                             modifier = Modifier.fillMaxWidth().height(110.dp),
                         )
                     }
@@ -247,6 +262,41 @@ private fun ZoneInfoRow(zone: HrZone, range: String, description: String) {
             Text(description, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
         }
         Text(range, style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+    }
+}
+
+@Composable
+private fun HrvChart(data: List<Pair<Long, Double>>, modifier: Modifier = Modifier) {
+    val values = data.map { it.second }
+    val minVal = ((values.minOrNull() ?: 20.0) - 5.0).coerceAtLeast(0.0)
+    val maxVal = (values.maxOrNull() ?: 80.0) + 5.0
+    val range = (maxVal - minVal).coerceAtLeast(1.0).toFloat()
+
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val pts = values.mapIndexed { i, v ->
+            val x = (i.toFloat() / (values.size - 1)) * w
+            val y = h - (((v - minVal) / range * h * 0.8f + h * 0.1f).toFloat())
+            Offset(x, y)
+        }
+
+        val fillPath = Path().apply {
+            moveTo(pts.first().x, h)
+            pts.forEach { lineTo(it.x, it.y) }
+            lineTo(pts.last().x, h)
+            close()
+        }
+        drawPath(fillPath, color = PurpleAccent.copy(alpha = 0.08f))
+
+        val linePath = Path().apply {
+            pts.forEachIndexed { i, pt -> if (i == 0) moveTo(pt.x, pt.y) else lineTo(pt.x, pt.y) }
+        }
+        drawPath(linePath, color = PurpleAccent, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round))
+
+        pts.forEach { pt ->
+            drawCircle(color = PurpleAccent.copy(alpha = 0.4f), radius = 2.5.dp.toPx(), center = pt)
+        }
     }
 }
 

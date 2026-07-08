@@ -23,8 +23,8 @@ data class HeartRateUiState(
     val avgRestingHr: Int = 0,
     val maxRecordedHr: Int = 0,
     val zoneSummaries: List<HeartRateZoneSummary> = emptyList(),
-    // Pairs of (epochSecond, bpm) from RestingHeartRateRecord — dedicated resting HR measurements
     val restingHrHistory: List<Pair<Long, Int>> = emptyList(),
+    val hrvHistory: List<Pair<Long, Double>> = emptyList(),
     val maxHrSetting: Int = 190,
 )
 
@@ -49,13 +49,17 @@ class HeartRateViewModel @Inject constructor(
             val maxHr = appPreferences.maxHeartRate.first()
             _uiState.value = _uiState.value.copy(isLoading = true, maxHrSetting = maxHr)
 
-            // Load dedicated resting HR records in parallel with activity load
+            // Load dedicated resting HR + HRV records in parallel with activity load
             val restingHrDeferred = async {
                 runCatching { healthConnectManager.readRestingHeartRateHistory(30) }.getOrDefault(emptyList())
+            }
+            val hrvDeferred = async {
+                runCatching { healthConnectManager.readHrvHistory(30) }.getOrDefault(emptyList())
             }
 
             activityRepository.getActivities(daysBack = 30).collectLatest { result ->
                 val restingHrHistory = restingHrDeferred.await()
+                val hrvRaw = hrvDeferred.await()
 
                 result.onSuccess { activities ->
                     val zoneMinutes = mutableMapOf<HrZone, Long>()
@@ -85,6 +89,10 @@ class HeartRateViewModel @Inject constructor(
                         maxRecordedHr = if (allBpms.isNotEmpty()) allBpms.max() else 0,
                         zoneSummaries = zoneSummaries,
                         restingHrHistory = restingHrHistory
+                            .sortedBy { it.first }
+                            .takeLast(30)
+                            .map { it.first.epochSecond to it.second },
+                        hrvHistory = hrvRaw
                             .sortedBy { it.first }
                             .takeLast(30)
                             .map { it.first.epochSecond to it.second },

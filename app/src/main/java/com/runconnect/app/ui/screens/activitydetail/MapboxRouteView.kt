@@ -3,13 +3,23 @@ package com.runconnect.app.ui.screens.activitydetail
 import android.view.Gravity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocationOff
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
@@ -32,12 +42,14 @@ import com.mapbox.maps.extension.style.terrain.generated.terrain
 import com.mapbox.maps.extension.style.sources.generated.rasterDemSource
 import com.mapbox.maps.plugin.animation.camera
 import com.runconnect.app.domain.model.RoutePoint
-import com.runconnect.app.ui.theme.Background
+import com.runconnect.app.ui.theme.CardDark
 import com.runconnect.app.ui.theme.TealPrimary
+import com.runconnect.app.ui.theme.TextSecondary
 
 @Composable
 fun MapboxRouteView(
     routePoints: List<RoutePoint>,
+    isLoading: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     if (routePoints.isEmpty()) {
@@ -46,8 +58,28 @@ fun MapboxRouteView(
                 .fillMaxWidth()
                 .height(260.dp)
                 .clip(RoundedCornerShape(16.dp))
-                .background(Background)
-        )
+                .background(CardDark),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (isLoading) {
+                CircularProgressIndicator(color = TealPrimary, modifier = Modifier.size(28.dp))
+            } else {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        Icons.Filled.LocationOff,
+                        contentDescription = null,
+                        tint = TextSecondary,
+                        modifier = Modifier.size(28.dp),
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "No GPS route available",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary,
+                    )
+                }
+            }
+        }
         return
     }
 
