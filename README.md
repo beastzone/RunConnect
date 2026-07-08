@@ -39,7 +39,7 @@ Download the latest APK from the [Releases](https://github.com/beastzone/RunConn
 - Max HR configurable in Settings (default 190 bpm)
 
 ### Settings
-- **Health Connect** — tap "Grant Permissions" to authorize data access (required)
+- **Health Connect** — tap "Grant Permissions" to open the Health Connect dialog; shows SDK status and how many permissions are granted. If the dialog doesn't open, tap "Open Health Connect App" to grant access manually
 - **Units** — toggle miles/km, lbs/kg
 - **Max heart rate** — used to compute HR zone boundaries
 - **Mapbox token** — free public token from account.mapbox.com, required for 3D route maps
@@ -108,7 +108,7 @@ No local Android Studio required. Every push to `main` triggers a GitHub Actions
 ## Planned / In Progress
 
 - [ ] GPS route display on 3D map (stubbed — Health Connect 1.1.0 `readExerciseRoute()` API)
-- [x] Health Connect permission grant button — fixed manifest missing `<queries>` block and `ACTION_SHOW_PERMISSIONS_RATIONALE` intent filter (required for dialog to open)
+- [x] Health Connect permission grant — fixed manifest `ACTION_SHOW_PERMISSIONS_RATIONALE` missing `DEFAULT` category (root cause: HC's `queryIntentActivities()` returned nothing without it, silently blocking the dialog); added try/catch + Toast for errors, direct fallback button to open HC app manually
 - [ ] Withings body composition (weight, body fat) via Health Connect
 - [ ] VO2 max trend chart
 - [ ] Training load / chronic load calculations

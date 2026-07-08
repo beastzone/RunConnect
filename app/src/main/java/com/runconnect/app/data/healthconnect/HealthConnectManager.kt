@@ -37,8 +37,11 @@ class HealthConnectManager @Inject constructor(
         runCatching { HealthConnectClient.getOrCreate(context) }.getOrNull()
     }
 
+    val sdkStatus: Int
+        get() = HealthConnectClient.getSdkStatus(context)
+
     val isAvailable: Boolean
-        get() = HealthConnectClient.getSdkStatus(context) == HealthConnectClient.SDK_AVAILABLE
+        get() = sdkStatus == HealthConnectClient.SDK_AVAILABLE
 
     val requiredPermissions = setOf(
         HealthPermission.getReadPermission(ExerciseSessionRecord::class),

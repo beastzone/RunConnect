@@ -1,5 +1,6 @@
 package com.runconnect.app.ui.screens.settings
 
+import androidx.health.connect.client.HealthConnectClient
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.runconnect.app.data.healthconnect.HealthConnectManager
@@ -20,8 +21,18 @@ data class SettingsUiState(
     val garminConsumerKey: String = "",
     val garminConnected: Boolean = false,
     val healthConnectAvailable: Boolean = false,
+    val healthConnectSdkStatus: Int = -1,
     val healthConnectPermissionsGranted: Boolean = false,
-)
+    val healthConnectGrantedCount: Int = 0,
+    val healthConnectRequiredCount: Int = 0,
+) {
+    val healthConnectStatusLabel: String get() = when (healthConnectSdkStatus) {
+        HealthConnectClient.SDK_AVAILABLE -> "Available (SDK ${healthConnectSdkStatus})"
+        HealthConnectClient.SDK_UNAVAILABLE -> "Not installed (SDK ${healthConnectSdkStatus})"
+        HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED -> "Needs update (SDK ${healthConnectSdkStatus})"
+        else -> "Unknown (SDK ${healthConnectSdkStatus})"
+    }
+}
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
@@ -47,14 +58,11 @@ class SettingsViewModel @Inject constructor(
                     mapboxToken = mapbox,
                     garminConnected = garminAuth,
                     healthConnectAvailable = healthConnectManager.isAvailable,
+                    healthConnectSdkStatus = healthConnectManager.sdkStatus,
                 )
             }.collect {}
         }
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(
-                healthConnectPermissionsGranted = healthConnectManager.hasAllPermissions()
-            )
-        }
+        viewModelScope.launch { refreshPermissionsInternal() }
     }
 
     fun setUseImperial(value: Boolean) = viewModelScope.launch {
@@ -84,9 +92,17 @@ class SettingsViewModel @Inject constructor(
     val requiredPermissions: Set<String>
         get() = healthConnectManager.requiredPermissions
 
-    fun refreshPermissions() = viewModelScope.launch {
+    fun refreshPermissions() = viewModelScope.launch { refreshPermissionsInternal() }
+
+    private suspend fun refreshPermissionsInternal() {
+        val granted = runCatching { healthConnectManager.checkPermissions() }.getOrDefault(emptySet())
+        val required = healthConnectManager.requiredPermissions
         _uiState.value = _uiState.value.copy(
-            healthConnectPermissionsGranted = healthConnectManager.hasAllPermissions()
+            healthConnectSdkStatus = healthConnectManager.sdkStatus,
+            healthConnectAvailable = healthConnectManager.isAvailable,
+            healthConnectPermissionsGranted = required.all { it in granted },
+            healthConnectGrantedCount = granted.count { it in required },
+            healthConnectRequiredCount = required.size,
         )
     }
 }

@@ -47,9 +47,12 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Required by Health Connect: where to send users for privacy policy -->
+            <!-- Required by Health Connect: HC queries for this activity before showing the
+                 permission dialog. The DEFAULT category is mandatory — without it,
+                 queryIntentActivities() returns nothing and HC silently skips the dialog. -->
             <intent-filter>
                 <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
             <!-- Deep link for Garmin OAuth callback -->
             <intent-filter android:autoVerify="true">
