@@ -82,11 +82,15 @@ class HealthConnectManager @Inject constructor(
         return requiredPermissions.all { it in granted }
     }
 
+    // Reads all activities for the range using 6 bulk API calls instead of 5*N+1.
+    // Previously each activity triggered 5 separate HC reads (HR, speed, distance,
+    // calories, elevation), blowing through HC's rate limit for any non-trivial history.
     suspend fun readActivities(
         startTime: Instant = Instant.now().minus(90, ChronoUnit.DAYS),
         endTime: Instant = Instant.now(),
     ): List<Activity> {
         val c = client ?: return emptyList()
+
         val sessions = c.readRecords(
             ReadRecordsRequest(
                 recordType = ExerciseSessionRecord::class,
@@ -95,13 +99,68 @@ class HealthConnectManager @Inject constructor(
             )
         ).records
 
+        if (sessions.isEmpty()) return emptyList()
+
+        // Bulk-read all supporting data for the full range — one call each
+        val allHr = c.readRecords(
+            ReadRecordsRequest(
+                recordType = HeartRateRecord::class,
+                timeRangeFilter = TimeRangeFilter.between(startTime, endTime),
+            )
+        ).records
+
+        val allSpeed = c.readRecords(
+            ReadRecordsRequest(
+                recordType = SpeedRecord::class,
+                timeRangeFilter = TimeRangeFilter.between(startTime, endTime),
+            )
+        ).records
+
+        val allDistance = c.readRecords(
+            ReadRecordsRequest(
+                recordType = DistanceRecord::class,
+                timeRangeFilter = TimeRangeFilter.between(startTime, endTime),
+            )
+        ).records
+
+        val allCalories = c.readRecords(
+            ReadRecordsRequest(
+                recordType = ActiveCaloriesBurnedRecord::class,
+                timeRangeFilter = TimeRangeFilter.between(startTime, endTime),
+            )
+        ).records
+
+        val allElevation = c.readRecords(
+            ReadRecordsRequest(
+                recordType = ElevationGainedRecord::class,
+                timeRangeFilter = TimeRangeFilter.between(startTime, endTime),
+            )
+        ).records
+
         return sessions.map { session ->
-            val heartRateSamples = readHeartRateSamples(c, session.startTime, session.endTime)
-            val speedSamples = readSpeedSamples(c, session.startTime, session.endTime)
-            val distance = readTotalDistance(c, session.startTime, session.endTime)
-            val calories = readCalories(c, session.startTime, session.endTime)
-            val elevation = readElevationGain(c, session.startTime, session.endTime)
-            // Route is loaded on demand in readExerciseRoute() to avoid per-activity network overhead
+            val sStart = session.startTime
+            val sEnd = session.endTime
+
+            val heartRateSamples = allHr
+                .filter { it.startTime >= sStart && it.endTime <= sEnd }
+                .flatMap { r -> r.samples.map { HeartRateSample(it.time, it.beatsPerMinute) } }
+
+            val speedSamples = allSpeed
+                .filter { it.startTime >= sStart && it.endTime <= sEnd }
+                .flatMap { r -> r.samples.map { SpeedSample(it.time, it.speed.inMetersPerSecond) } }
+
+            val distance = allDistance
+                .filter { it.startTime >= sStart && it.endTime <= sEnd }
+                .sumOf { it.distance.inMeters }
+
+            val calories = allCalories
+                .filter { it.startTime >= sStart && it.endTime <= sEnd }
+                .sumOf { it.energy.inKilocalories }.takeIf { it > 0 }
+
+            val elevation = allElevation
+                .filter { it.startTime >= sStart && it.endTime <= sEnd }
+                .sumOf { it.elevation.inMeters }
+
             val laps = session.segments.mapIndexed { idx, seg ->
                 LapData(
                     lapNumber = idx + 1,
@@ -115,7 +174,7 @@ class HealthConnectManager @Inject constructor(
                 )
             }
 
-            val durationS = session.endTime.epochSecond - session.startTime.epochSecond
+            val durationS = sEnd.epochSecond - sStart.epochSecond
             val avgSpeed = if (distance > 0 && durationS > 0) distance / durationS else null
             val avgHr = heartRateSamples.map { it.bpm }.average().takeIf { !it.isNaN() }?.toInt()
             val maxHr = heartRateSamples.maxOfOrNull { it.bpm }?.toInt()
@@ -124,8 +183,8 @@ class HealthConnectManager @Inject constructor(
                 id = session.metadata.id,
                 type = ActivityType.fromHealthConnectType(session.exerciseType),
                 title = session.title ?: ActivityType.fromHealthConnectType(session.exerciseType).label,
-                startTime = session.startTime,
-                endTime = session.endTime,
+                startTime = sStart,
+                endTime = sEnd,
                 durationSeconds = durationS,
                 distanceMeters = distance,
                 elevationGainMeters = elevation,
@@ -197,9 +256,7 @@ class HealthConnectManager @Inject constructor(
         }
     }
 
-    suspend fun readRestingHeartRateHistory(
-        days: Int = 30,
-    ): List<Pair<Instant, Int>> {
+    suspend fun readRestingHeartRateHistory(days: Int = 30): List<Pair<Instant, Int>> {
         val c = client ?: return emptyList()
         val start = Instant.now().minus(days.toLong(), ChronoUnit.DAYS)
         return c.readRecords(
@@ -211,9 +268,7 @@ class HealthConnectManager @Inject constructor(
         ).records.map { it.time to it.beatsPerMinute.toInt() }
     }
 
-    suspend fun readHrvHistory(
-        days: Int = 30,
-    ): List<Pair<Instant, Double>> {
+    suspend fun readHrvHistory(days: Int = 30): List<Pair<Instant, Double>> {
         val c = client ?: return emptyList()
         val start = Instant.now().minus(days.toLong(), ChronoUnit.DAYS)
         return c.readRecords(
@@ -254,7 +309,9 @@ class HealthConnectManager @Inject constructor(
                 timeRangeFilter = TimeRangeFilter.between(start, Instant.now()),
                 ascendingOrder = false,
             )
-        ).records.map { BodyMetricsSample(timestamp = it.time, weightKg = it.weight.inKilograms, bodyFatPercent = null) }
+        ).records.map {
+            BodyMetricsSample(timestamp = it.time, weightKg = it.weight.inKilograms, bodyFatPercent = null)
+        }
     }
 
     suspend fun readBodyFatHistory(days: Int = 90): List<BodyMetricsSample> {
@@ -266,70 +323,8 @@ class HealthConnectManager @Inject constructor(
                 timeRangeFilter = TimeRangeFilter.between(start, Instant.now()),
                 ascendingOrder = false,
             )
-        ).records.map { BodyMetricsSample(timestamp = it.time, weightKg = null, bodyFatPercent = it.percentage.value) }
+        ).records.map {
+            BodyMetricsSample(timestamp = it.time, weightKg = null, bodyFatPercent = it.percentage.value)
+        }
     }
-
-    private suspend fun readHeartRateSamples(
-        c: HealthConnectClient,
-        start: Instant,
-        end: Instant,
-    ): List<HeartRateSample> =
-        c.readRecords(
-            ReadRecordsRequest(
-                recordType = HeartRateRecord::class,
-                timeRangeFilter = TimeRangeFilter.between(start, end),
-            )
-        ).records.flatMap { record ->
-            record.samples.map { HeartRateSample(it.time, it.beatsPerMinute) }
-        }
-
-    private suspend fun readSpeedSamples(
-        c: HealthConnectClient,
-        start: Instant,
-        end: Instant,
-    ): List<SpeedSample> =
-        c.readRecords(
-            ReadRecordsRequest(
-                recordType = SpeedRecord::class,
-                timeRangeFilter = TimeRangeFilter.between(start, end),
-            )
-        ).records.flatMap { record ->
-            record.samples.map { SpeedSample(it.time, it.speed.inMetersPerSecond) }
-        }
-
-    private suspend fun readTotalDistance(
-        c: HealthConnectClient,
-        start: Instant,
-        end: Instant,
-    ): Double =
-        c.readRecords(
-            ReadRecordsRequest(
-                recordType = DistanceRecord::class,
-                timeRangeFilter = TimeRangeFilter.between(start, end),
-            )
-        ).records.sumOf { it.distance.inMeters }
-
-    private suspend fun readCalories(
-        c: HealthConnectClient,
-        start: Instant,
-        end: Instant,
-    ): Double? =
-        c.readRecords(
-            ReadRecordsRequest(
-                recordType = ActiveCaloriesBurnedRecord::class,
-                timeRangeFilter = TimeRangeFilter.between(start, end),
-            )
-        ).records.sumOf { it.energy.inKilocalories }.takeIf { it > 0 }
-
-    private suspend fun readElevationGain(
-        c: HealthConnectClient,
-        start: Instant,
-        end: Instant,
-    ): Double =
-        c.readRecords(
-            ReadRecordsRequest(
-                recordType = ElevationGainedRecord::class,
-                timeRangeFilter = TimeRangeFilter.between(start, end),
-            )
-        ).records.sumOf { it.elevation.inMeters }
 }

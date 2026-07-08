@@ -46,16 +46,27 @@ class ActivityRepository @Inject constructor(
             emit(Result.success(activities))
         } else {
             val e = fetchResult.exceptionOrNull()!!
+            // Always return stale cache on any fetch failure so the UI keeps showing data
             if (cache.isNotEmpty()) {
                 emit(Result.success(cache.toList()))
             } else {
+                val msg = e.message.orEmpty() + (e.cause?.message.orEmpty())
                 val isPermissionError = e is SecurityException ||
                     e.cause is SecurityException ||
-                    e.message?.contains("SecurityException") == true ||
-                    e.message?.contains("permission", ignoreCase = true) == true
-                val reported = if (isPermissionError)
-                    Exception("Health Connect permissions not granted. Go to Settings → Health Connect → Grant Permissions.")
-                else e
+                    msg.contains("SecurityException") ||
+                    msg.contains("permission", ignoreCase = true)
+                val isRateLimited = msg.contains("quota", ignoreCase = true) ||
+                    msg.contains("rate limit", ignoreCase = true)
+                val reported = when {
+                    isRateLimited -> Exception(
+                        "Health Connect rate limit reached. Wait a minute and try again.\n" +
+                        "(Tip: the previous sync may still be loading — check back shortly.)"
+                    )
+                    isPermissionError -> Exception(
+                        "Health Connect permissions not granted. Go to Settings → Health Connect → Grant Permissions."
+                    )
+                    else -> e
+                }
                 emit(Result.failure(reported))
             }
         }
@@ -80,7 +91,6 @@ class ActivityRepository @Inject constructor(
     }
 
     fun invalidateCache() {
-        cache.clear()
-        cacheTime = null
+        cacheTime = null  // Mark stale — cache data survives as fallback if next fetch fails
     }
 }
