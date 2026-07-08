@@ -80,14 +80,9 @@ class HealthConnectManager @Inject constructor(
             val distance = readTotalDistance(c, session.startTime, session.endTime)
             val calories = readCalories(c, session.startTime, session.endTime)
             val elevation = readElevationGain(c, session.startTime, session.endTime)
-            val route = session.exerciseRoute?.route?.map { loc ->
-                RoutePoint(
-                    latitude = loc.latitude,
-                    longitude = loc.longitude,
-                    altitudeMeters = loc.altitude?.inMeters,
-                    timestamp = loc.time,
-                )
-            } ?: emptyList()
+            // HC 1.1.0 removed direct route access from ExerciseSessionRecord;
+            // use client.readExerciseRoute(id) returning ExerciseRouteResult in a follow-up.
+            val route = emptyList<RoutePoint>()
             val laps = session.segments.mapIndexed { idx, seg ->
                 LapData(
                     lapNumber = idx + 1,
