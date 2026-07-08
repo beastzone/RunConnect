@@ -21,7 +21,6 @@
     <uses-permission android:name="android.permission.health.READ_WEIGHT" />
     <uses-permission android:name="android.permission.health.READ_BODY_FAT" />
     <uses-permission android:name="android.permission.health.READ_OXYGEN_SATURATION" />
-    <uses-permission android:name="android.permission.health.READ_RESPIRATORY_RATE" />
 
     <!-- Required on Android 11+ so the app can detect the Health Connect package -->
     <queries>

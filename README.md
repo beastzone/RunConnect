@@ -50,7 +50,7 @@ Download the latest APK from the [Releases](https://github.com/beastzone/RunConn
 - **Nap detection** — sessions < 3 h starting between 8 am–8 pm shown in a separate nap section, excluded from main analytics
 - **Overnight HR chart** — Canvas line chart with touch scrubbing; avg and lowest HR + time-of-lowest callouts
 - **Overnight HRV chart** — ms trend with avg and range
-- **Overnight respiration chart** — breaths/min trend with avg
+- **Overnight respiration** — shown when data is available (requires a future HC SDK update; currently displays "not available" placeholder)
 - **Overnight SpO2 chart** — %-saturation trend with 95% threshold line; avg, min, and minutes-below-threshold callouts; wellness disclaimer
 - **Sleep factor tags** — tag a night with Alcohol, Caffeine, Late Meal, Evening Workout, Medication, Stress, Illness, Screen Time, Travel, Meditation, or Reading
 - **Sleep environment notes** — free-text notes, room temperature, noise level (Silent/Low/Medium/High), light level (Dark/Dim/Light), travel toggle; auto-saved with 300 ms debounce
@@ -115,7 +115,6 @@ Download the latest APK from the [Releases](https://github.com/beastzone/RunConn
 | Weight | Health Connect `WeightRecord` ← Withings |
 | Body fat % | Health Connect `BodyFatRecord` ← Withings |
 | Overnight SpO2 | Health Connect `OxygenSaturationRecord` ← Garmin / Withings |
-| Overnight respiration | Health Connect `RespirationRateRecord` ← Garmin / Withings |
 
 ---
 
@@ -173,4 +172,3 @@ No local Android Studio required. Every push to `main` triggers a GitHub Actions
 | READ_WEIGHT | Body weight trend (Withings) |
 | READ_BODY_FAT | Body fat trend (Withings) |
 | READ_OXYGEN_SATURATION | Overnight SpO2 in sleep analytics |
-| READ_RESPIRATORY_RATE | Overnight breathing rate in sleep analytics |

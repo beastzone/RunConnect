@@ -12,7 +12,6 @@ import androidx.health.connect.client.records.HeartRateRecord
 import androidx.health.connect.client.records.HeartRateVariabilityRmssdRecord
 import androidx.health.connect.client.records.OxygenSaturationRecord
 import androidx.health.connect.client.records.PowerRecord
-import androidx.health.connect.client.records.RespirationRateRecord
 import androidx.health.connect.client.records.RestingHeartRateRecord
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.SpeedRecord
@@ -80,7 +79,6 @@ class HealthConnectManager @Inject constructor(
         PermissionInfo(HealthPermission.getReadPermission(WeightRecord::class), "Weight", "Body weight trend from Withings"),
         PermissionInfo(HealthPermission.getReadPermission(BodyFatRecord::class), "Body Fat", "Body fat % trend from Withings"),
         PermissionInfo(HealthPermission.getReadPermission(OxygenSaturationRecord::class), "Oxygen Saturation (SpO2)", "Overnight SpO2 in sleep analytics"),
-        PermissionInfo(HealthPermission.getReadPermission(RespirationRateRecord::class), "Respiratory Rate", "Overnight breathing rate in sleep analytics"),
     )
 
     val requiredPermissions = permissionInfoList.map { it.permission }.toSet()
@@ -316,10 +314,6 @@ class HealthConnectManager @Inject constructor(
             c.readRecords(ReadRecordsRequest(OxygenSaturationRecord::class, TimeRangeFilter.between(startTime, endTime))).records
         }.getOrDefault(emptyList())
 
-        val respRecords = runCatching {
-            c.readRecords(ReadRecordsRequest(RespirationRateRecord::class, TimeRangeFilter.between(startTime, endTime))).records
-        }.getOrDefault(emptyList())
-
         return baseSessions.map { session ->
             session.copy(
                 heartRateSamples = hrRecords.flatMap { r ->
@@ -330,8 +324,6 @@ class HealthConnectManager @Inject constructor(
                     .map { it.time to it.heartRateVariabilityMillis },
                 spo2Samples = spo2Records.filter { it.time >= session.startTime && it.time <= session.endTime }
                     .map { it.time to it.percentage.value },
-                respirationSamples = respRecords.filter { it.time >= session.startTime && it.time <= session.endTime }
-                    .map { it.time to it.rate },
             )
         }
     }
