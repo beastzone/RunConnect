@@ -24,9 +24,9 @@ Download the latest APK from the [Releases](https://github.com/beastzone/RunConn
 - Full list of runs, hikes, walks, cycles from the past 90 days
 - Per-activity detail screen with:
   - **3D Mapbox map** with GPS route and terrain elevation (route loaded on-demand from Health Connect)
-  - Elevation profile chart
-  - Pace chart
-  - Heart rate chart
+  - **Elevation profile chart** — with X/Y axis labels and touch scrubbing (altitude + distance tooltip)
+  - **Pace chart** — with X/Y axis labels and touch scrubbing (pace tooltip)
+  - **Heart rate chart** — with X/Y axis labels and touch scrubbing (BPM tooltip)
   - Lap splits table
   - **Race predictions** via the Riegel formula (`T2 = T1 × (D2/D1)^1.06`) for 1 mi, 5K, 10K, half marathon, and full marathon
 
@@ -38,12 +38,13 @@ Download the latest APK from the [Releases](https://github.com/beastzone/RunConn
 
 ### Heart Rate
 - HR zone distribution (Zone 1–5 based on % of max HR)
-- **Resting HR trend chart** — uses dedicated `RestingHeartRateRecord` from Garmin/Withings (not estimated from activity samples)
+- **Resting HR trend chart** — uses dedicated `RestingHeartRateRecord` from Garmin/Withings (not estimated from activity samples); X/Y axis labels + touch scrubbing
+- **HRV trend chart** — X/Y axis labels + touch scrubbing (ms tooltip with date)
 - Max HR configurable in Settings
 
 ### Body Metrics _(new)_
-- Weight trend chart (90 days from Withings via Health Connect)
-- Body fat % trend chart
+- Weight trend chart (90 days from Withings via Health Connect) — X/Y axis labels + touch scrubbing
+- Body fat % trend chart — X/Y axis labels + touch scrubbing
 - 90-day change indicators
 - Measurement history table
 
@@ -97,7 +98,7 @@ Download the latest APK from the [Releases](https://github.com/beastzone/RunConn
 | DI | Hilt |
 | Health data | Health Connect SDK 1.1.0-rc01 |
 | Maps | Mapbox Maps SDK v11 (3D terrain) |
-| Charts | Custom Canvas (elevation, pace, HR, resting HR trend, weight trend) |
+| Charts | Custom Canvas with touch scrubbing and axis labels (elevation, pace, HR, resting HR, HRV, weight, body fat) |
 | Networking | Retrofit + OkHttp + Moshi |
 | Storage | DataStore Preferences |
 | Race predictions | Riegel formula |

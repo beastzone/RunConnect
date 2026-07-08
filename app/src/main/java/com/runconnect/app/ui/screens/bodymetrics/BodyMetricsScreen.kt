@@ -22,6 +22,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,9 +33,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.runconnect.app.ui.components.axisLabelStyle
+import com.runconnect.app.ui.components.chartScrubber
+import com.runconnect.app.ui.components.drawScrubberTooltip
+import com.runconnect.app.ui.components.epochSecondsToMonthDay
+import kotlin.math.roundToInt
 import com.runconnect.app.domain.model.BodyMetricsSample
 import com.runconnect.app.ui.components.SectionHeader
 import com.runconnect.app.ui.components.SmallStatItem
@@ -136,8 +146,9 @@ fun BodyMetricsScreen(viewModel: BodyMetricsViewModel = hiltViewModel()) {
                         MetricTrendChart(
                             samples = weightSamples,
                             getValue = { it.weightKg!! * if (state.useImperial) 2.20462 else 1.0 },
+                            unit = if (state.useImperial) "lbs" else "kg",
                             color = TealPrimary,
-                            modifier = Modifier.fillMaxWidth().height(120.dp),
+                            modifier = Modifier.fillMaxWidth().height(140.dp),
                         )
                     }
                 }
@@ -153,8 +164,9 @@ fun BodyMetricsScreen(viewModel: BodyMetricsViewModel = hiltViewModel()) {
                         MetricTrendChart(
                             samples = fatSamples,
                             getValue = { it.bodyFatPercent!! },
+                            unit = "%",
                             color = AmberAccent,
-                            modifier = Modifier.fillMaxWidth().height(120.dp),
+                            modifier = Modifier.fillMaxWidth().height(140.dp),
                         )
                     }
                 }
@@ -179,6 +191,7 @@ fun BodyMetricsScreen(viewModel: BodyMetricsViewModel = hiltViewModel()) {
 private fun MetricTrendChart(
     samples: List<BodyMetricsSample>,
     getValue: (BodyMetricsSample) -> Double,
+    unit: String,
     color: Color,
     modifier: Modifier = Modifier,
 ) {
@@ -186,34 +199,99 @@ private fun MetricTrendChart(
     val minVal = values.minOrNull() ?: return
     val maxVal = values.maxOrNull() ?: return
     val range = (maxVal - minVal).coerceAtLeast(0.1)
+    val reversedSamples = samples.reversed()  // oldest first
 
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-        val points = values.reversed().mapIndexed { i, v ->
-            val x = (i.toFloat() / (values.size - 1)) * w
-            val y = h - ((v - minVal) / range * h * 0.8f + h * 0.1f).toFloat()
-            Offset(x, y)
+    val textMeasurer = rememberTextMeasurer()
+    var scrubberX by remember { mutableStateOf<Float?>(null) }
+
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(CardDark)
+    ) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .chartScrubber { scrubberX = it }
+        ) {
+            val axisBottomPad = 18.dp.toPx()
+            val axisRightPad = 34.dp.toPx()
+            val chartW = size.width - axisRightPad
+            val chartH = size.height - axisBottomPad
+
+            fun xFor(i: Int) = (i.toFloat() / (values.size - 1)) * chartW
+            fun yFor(v: Double) = chartH - ((v - minVal) / range * chartH * 0.8f + chartH * 0.1f).toFloat()
+
+            val points = reversedSamples.mapIndexed { i, s -> Offset(xFor(i), yFor(getValue(s))) }
+
+            // Fill
+            val fillPath = Path().apply {
+                moveTo(points.first().x, chartH)
+                points.forEach { lineTo(it.x, it.y) }
+                lineTo(points.last().x, chartH)
+                close()
+            }
+            drawPath(fillPath, color = color.copy(alpha = 0.08f))
+
+            // Line
+            val linePath = Path().apply {
+                points.forEachIndexed { i, pt -> if (i == 0) moveTo(pt.x, pt.y) else lineTo(pt.x, pt.y) }
+            }
+            drawPath(linePath, color = color, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round))
+
+            // Dots for first and last
+            drawCircle(color = color, radius = 4.dp.toPx(), center = points.first())
+            drawCircle(color = color, radius = 4.dp.toPx(), center = points.last())
+
+            // Y axis labels: top=maxVal, bottom=minVal
+            val axisStyle = axisLabelStyle
+            val midVal = (minVal + maxVal) / 2
+            listOf(
+                0.1f * chartH to maxVal,
+                0.5f * chartH to midVal,
+                0.9f * chartH to minVal,
+            ).forEach { (y, v) ->
+                val label = "%.1f".format(v)
+                val m = textMeasurer.measure(label, axisStyle)
+                drawText(
+                    textMeasurer, label,
+                    topLeft = Offset(chartW + 3.dp.toPx(), (y - m.size.height.toFloat() / 2f).coerceAtLeast(0f)),
+                    style = axisStyle,
+                )
+            }
+
+            // X axis labels: oldest, mid, newest
+            val midIdx = reversedSamples.size / 2
+            listOf(
+                0f to reversedSamples.first().timestamp.epochSecond,
+                0.5f to reversedSamples[midIdx].timestamp.epochSecond,
+                1f to reversedSamples.last().timestamp.epochSecond,
+            ).forEach { (frac, epoch) ->
+                val label = epochSecondsToMonthDay(epoch)
+                val m = textMeasurer.measure(label, axisStyle)
+                val cx = frac * chartW
+                val lx = when {
+                    frac == 0f -> cx
+                    frac == 1f -> (cx - m.size.width.toFloat()).coerceAtMost(chartW - m.size.width.toFloat())
+                    else -> cx - m.size.width.toFloat() / 2f
+                }
+                drawText(textMeasurer, label, topLeft = Offset(lx, chartH + 3.dp.toPx()), style = axisStyle)
+            }
+
+            // Scrubber
+            scrubberX?.let { sx ->
+                val idx = (sx / chartW * (values.size - 1)).roundToInt().coerceIn(0, values.size - 1)
+                val pt = points[idx]
+                val sample = reversedSamples[idx]
+                val value = getValue(sample)
+                val epoch = sample.timestamp.epochSecond
+                drawLine(Color.White.copy(alpha = 0.25f), Offset(pt.x, 0f), Offset(pt.x, chartH), 1.5f)
+                drawCircle(color, 5.dp.toPx(), pt)
+                drawCircle(Color.White, 2.5.dp.toPx(), pt)
+                val valueStr = if (unit == "%") "%.1f%%".format(value) else "%.1f $unit".format(value)
+                drawScrubberTooltip(textMeasurer, "$valueStr · ${epochSecondsToMonthDay(epoch)}", pt.x, pt.y, chartW)
+            }
         }
-
-        // Fill area under line
-        val fillPath = Path().apply {
-            moveTo(points.first().x, h)
-            points.forEach { lineTo(it.x, it.y) }
-            lineTo(points.last().x, h)
-            close()
-        }
-        drawPath(fillPath, color = color.copy(alpha = 0.08f))
-
-        // Draw line
-        val linePath = Path().apply {
-            points.forEachIndexed { i, pt -> if (i == 0) moveTo(pt.x, pt.y) else lineTo(pt.x, pt.y) }
-        }
-        drawPath(linePath, color = color, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round))
-
-        // Draw dots for first and last
-        drawCircle(color = color, radius = 4.dp.toPx(), center = points.first())
-        drawCircle(color = color, radius = 4.dp.toPx(), center = points.last())
     }
 }
 

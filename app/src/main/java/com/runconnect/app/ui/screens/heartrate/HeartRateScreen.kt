@@ -24,6 +24,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,9 +35,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.runconnect.app.ui.components.axisLabelStyle
+import com.runconnect.app.ui.components.chartScrubber
+import com.runconnect.app.ui.components.drawScrubberTooltip
+import com.runconnect.app.ui.components.epochSecondsToMonthDay
+import kotlin.math.roundToInt
 import com.runconnect.app.domain.model.HeartRateZoneSummary
 import com.runconnect.app.domain.model.HrZone
 import com.runconnect.app.ui.components.SectionHeader
@@ -119,7 +129,7 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = hiltViewModel()) {
                         Spacer(Modifier.height(10.dp))
                         RestingHrChart(
                             data = state.restingHrHistory,
-                            modifier = Modifier.fillMaxWidth().height(110.dp),
+                            modifier = Modifier.fillMaxWidth().height(130.dp),
                         )
                     }
                 }
@@ -133,7 +143,7 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = hiltViewModel()) {
                         Spacer(Modifier.height(10.dp))
                         HrvChart(
                             data = state.hrvHistory,
-                            modifier = Modifier.fillMaxWidth().height(110.dp),
+                            modifier = Modifier.fillMaxWidth().height(130.dp),
                         )
                     }
                 }
@@ -186,30 +196,88 @@ private fun RestingHrChart(data: List<Pair<Long, Int>>, modifier: Modifier = Mod
     val maxBpm = (bpms.maxOrNull() ?: 80) + 5
     val range = (maxBpm - minBpm).coerceAtLeast(1).toFloat()
 
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-        val pts = data.mapIndexed { i, (_, bpm) ->
-            val x = (i.toFloat() / (data.size - 1)) * w
-            val y = h - ((bpm - minBpm) / range * h * 0.8f + h * 0.1f)
-            Offset(x, y)
-        }
+    val textMeasurer = rememberTextMeasurer()
+    var scrubberX by remember { mutableStateOf<Float?>(null) }
 
-        val fillPath = Path().apply {
-            moveTo(pts.first().x, h)
-            pts.forEach { lineTo(it.x, it.y) }
-            lineTo(pts.last().x, h)
-            close()
-        }
-        drawPath(fillPath, color = BlueAccent.copy(alpha = 0.08f))
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(CardDark)
+    ) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .chartScrubber { scrubberX = it }
+        ) {
+            val axisBottomPad = 18.dp.toPx()
+            val axisRightPad = 34.dp.toPx()
+            val chartW = size.width - axisRightPad
+            val chartH = size.height - axisBottomPad
 
-        val linePath = Path().apply {
-            pts.forEachIndexed { i, pt -> if (i == 0) moveTo(pt.x, pt.y) else lineTo(pt.x, pt.y) }
-        }
-        drawPath(linePath, color = BlueAccent, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round))
+            fun xFor(i: Int) = (i.toFloat() / (data.size - 1)) * chartW
+            fun yFor(bpm: Int) = chartH - ((bpm - minBpm).toFloat() / range * chartH * 0.8f + chartH * 0.1f)
 
-        pts.forEach { pt ->
-            drawCircle(color = BlueAccent.copy(alpha = 0.4f), radius = 2.5.dp.toPx(), center = pt)
+            val pts = data.mapIndexed { i, (_, bpm) -> Offset(xFor(i), yFor(bpm)) }
+
+            val fillPath = Path().apply {
+                moveTo(pts.first().x, chartH)
+                pts.forEach { lineTo(it.x, it.y) }
+                lineTo(pts.last().x, chartH)
+                close()
+            }
+            drawPath(fillPath, color = BlueAccent.copy(alpha = 0.08f))
+
+            val linePath = Path().apply {
+                pts.forEachIndexed { i, pt -> if (i == 0) moveTo(pt.x, pt.y) else lineTo(pt.x, pt.y) }
+            }
+            drawPath(linePath, color = BlueAccent, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round))
+
+            pts.forEach { pt ->
+                drawCircle(color = BlueAccent.copy(alpha = 0.4f), radius = 2.5.dp.toPx(), center = pt)
+            }
+
+            // Y axis labels: top=maxBpm, bottom=minBpm
+            val axisStyle = axisLabelStyle
+            val midBpm = (minBpm + maxBpm) / 2
+            listOf(
+                0.1f * chartH to maxBpm,
+                0.5f * chartH to midBpm,
+                0.9f * chartH to minBpm,
+            ).forEach { (y, bpm) ->
+                val label = "$bpm"
+                val m = textMeasurer.measure(label, axisStyle)
+                drawText(
+                    textMeasurer, label,
+                    topLeft = Offset(chartW + 3.dp.toPx(), (y - m.size.height.toFloat() / 2f).coerceAtLeast(0f)),
+                    style = axisStyle,
+                )
+            }
+
+            // X axis labels: dates
+            val midIdx = data.size / 2
+            listOf(0f to data.first().first, 0.5f to data[midIdx].first, 1f to data.last().first)
+                .forEach { (frac, epoch) ->
+                    val label = epochSecondsToMonthDay(epoch)
+                    val m = textMeasurer.measure(label, axisStyle)
+                    val cx = frac * chartW
+                    val lx = when {
+                        frac == 0f -> cx
+                        frac == 1f -> (cx - m.size.width.toFloat()).coerceAtMost(chartW - m.size.width.toFloat())
+                        else -> cx - m.size.width.toFloat() / 2f
+                    }
+                    drawText(textMeasurer, label, topLeft = Offset(lx, chartH + 3.dp.toPx()), style = axisStyle)
+                }
+
+            // Scrubber
+            scrubberX?.let { sx ->
+                val idx = (sx / chartW * (data.size - 1)).roundToInt().coerceIn(0, data.size - 1)
+                val pt = pts[idx]
+                val (epoch, bpm) = data[idx]
+                drawLine(Color.White.copy(alpha = 0.25f), Offset(pt.x, 0f), Offset(pt.x, chartH), 1.5f)
+                drawCircle(BlueAccent, 5.dp.toPx(), pt)
+                drawCircle(Color.White, 2.5.dp.toPx(), pt)
+                drawScrubberTooltip(textMeasurer, "$bpm bpm · ${epochSecondsToMonthDay(epoch)}", pt.x, pt.y, chartW)
+            }
         }
     }
 }
@@ -272,30 +340,88 @@ private fun HrvChart(data: List<Pair<Long, Double>>, modifier: Modifier = Modifi
     val maxVal = (values.maxOrNull() ?: 80.0) + 5.0
     val range = (maxVal - minVal).coerceAtLeast(1.0).toFloat()
 
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-        val pts = values.mapIndexed { i, v ->
-            val x = (i.toFloat() / (values.size - 1)) * w
-            val y = h - (((v - minVal) / range * h * 0.8f + h * 0.1f).toFloat())
-            Offset(x, y)
-        }
+    val textMeasurer = rememberTextMeasurer()
+    var scrubberX by remember { mutableStateOf<Float?>(null) }
 
-        val fillPath = Path().apply {
-            moveTo(pts.first().x, h)
-            pts.forEach { lineTo(it.x, it.y) }
-            lineTo(pts.last().x, h)
-            close()
-        }
-        drawPath(fillPath, color = PurpleAccent.copy(alpha = 0.08f))
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(CardDark)
+    ) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .chartScrubber { scrubberX = it }
+        ) {
+            val axisBottomPad = 18.dp.toPx()
+            val axisRightPad = 38.dp.toPx()
+            val chartW = size.width - axisRightPad
+            val chartH = size.height - axisBottomPad
 
-        val linePath = Path().apply {
-            pts.forEachIndexed { i, pt -> if (i == 0) moveTo(pt.x, pt.y) else lineTo(pt.x, pt.y) }
-        }
-        drawPath(linePath, color = PurpleAccent, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round))
+            fun xFor(i: Int) = (i.toFloat() / (values.size - 1)) * chartW
+            fun yFor(v: Double) = chartH - (((v - minVal) / range * chartH * 0.8f + chartH * 0.1f).toFloat())
 
-        pts.forEach { pt ->
-            drawCircle(color = PurpleAccent.copy(alpha = 0.4f), radius = 2.5.dp.toPx(), center = pt)
+            val pts = values.mapIndexed { i, v -> Offset(xFor(i), yFor(v)) }
+
+            val fillPath = Path().apply {
+                moveTo(pts.first().x, chartH)
+                pts.forEach { lineTo(it.x, it.y) }
+                lineTo(pts.last().x, chartH)
+                close()
+            }
+            drawPath(fillPath, color = PurpleAccent.copy(alpha = 0.08f))
+
+            val linePath = Path().apply {
+                pts.forEachIndexed { i, pt -> if (i == 0) moveTo(pt.x, pt.y) else lineTo(pt.x, pt.y) }
+            }
+            drawPath(linePath, color = PurpleAccent, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round))
+
+            pts.forEach { pt ->
+                drawCircle(color = PurpleAccent.copy(alpha = 0.4f), radius = 2.5.dp.toPx(), center = pt)
+            }
+
+            // Y axis labels: top=maxVal, bottom=minVal
+            val axisStyle = axisLabelStyle
+            val midVal = (minVal + maxVal) / 2
+            listOf(
+                0.1f * chartH to maxVal,
+                0.5f * chartH to midVal,
+                0.9f * chartH to minVal,
+            ).forEach { (y, v) ->
+                val label = "%.0f".format(v)
+                val m = textMeasurer.measure(label, axisStyle)
+                drawText(
+                    textMeasurer, label,
+                    topLeft = Offset(chartW + 3.dp.toPx(), (y - m.size.height.toFloat() / 2f).coerceAtLeast(0f)),
+                    style = axisStyle,
+                )
+            }
+
+            // X axis labels: dates
+            val midIdx = data.size / 2
+            listOf(0f to data.first().first, 0.5f to data[midIdx].first, 1f to data.last().first)
+                .forEach { (frac, epoch) ->
+                    val label = epochSecondsToMonthDay(epoch)
+                    val m = textMeasurer.measure(label, axisStyle)
+                    val cx = frac * chartW
+                    val lx = when {
+                        frac == 0f -> cx
+                        frac == 1f -> (cx - m.size.width.toFloat()).coerceAtMost(chartW - m.size.width.toFloat())
+                        else -> cx - m.size.width.toFloat() / 2f
+                    }
+                    drawText(textMeasurer, label, topLeft = Offset(lx, chartH + 3.dp.toPx()), style = axisStyle)
+                }
+
+            // Scrubber
+            scrubberX?.let { sx ->
+                val idx = (sx / chartW * (values.size - 1)).roundToInt().coerceIn(0, values.size - 1)
+                val pt = pts[idx]
+                val (epoch, hrv) = data[idx]
+                drawLine(Color.White.copy(alpha = 0.25f), Offset(pt.x, 0f), Offset(pt.x, chartH), 1.5f)
+                drawCircle(PurpleAccent, 5.dp.toPx(), pt)
+                drawCircle(Color.White, 2.5.dp.toPx(), pt)
+                drawScrubberTooltip(textMeasurer, "%.0f ms · ${epochSecondsToMonthDay(epoch)}".format(hrv), pt.x, pt.y, chartW)
+            }
         }
     }
 }
