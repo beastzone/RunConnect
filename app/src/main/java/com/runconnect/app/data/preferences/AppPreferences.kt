@@ -22,6 +22,9 @@ class AppPreferences @Inject constructor(
         private val KEY_MAX_HR = stringPreferencesKey("max_heart_rate")
         private val KEY_LAST_SYNC_TIME = longPreferencesKey("last_sync_time")
         private val KEY_DATA_DAYS_BACK = intPreferencesKey("data_days_back")
+        private val KEY_HC_CHANGES_TOKEN = stringPreferencesKey("hc_changes_token")
+        private val KEY_BACKGROUND_SYNC_ENABLED = booleanPreferencesKey("background_sync_enabled")
+        private val KEY_LAST_BG_SYNC_TIME = longPreferencesKey("last_background_sync_time")
     }
 
     val useImperial: Flow<Boolean> = dataStore.data.map { it[KEY_USE_IMPERIAL] ?: false }
@@ -29,10 +32,18 @@ class AppPreferences @Inject constructor(
     val maxHeartRate: Flow<Int> = dataStore.data.map { it[KEY_MAX_HR]?.toIntOrNull() ?: 190 }
     val lastSyncTime: Flow<Long?> = dataStore.data.map { it[KEY_LAST_SYNC_TIME] }
     val dataDaysBack: Flow<Int> = dataStore.data.map { it[KEY_DATA_DAYS_BACK] ?: 90 }
+    val hcChangesToken: Flow<String?> = dataStore.data.map { it[KEY_HC_CHANGES_TOKEN] }
+    val backgroundSyncEnabled: Flow<Boolean> = dataStore.data.map { it[KEY_BACKGROUND_SYNC_ENABLED] ?: false }
+    val lastBackgroundSyncTime: Flow<Long?> = dataStore.data.map { it[KEY_LAST_BG_SYNC_TIME] }
 
     suspend fun setUseImperial(value: Boolean) { dataStore.edit { it[KEY_USE_IMPERIAL] = value } }
     suspend fun setMapboxToken(token: String) { dataStore.edit { it[KEY_MAPBOX_TOKEN] = token } }
     suspend fun setMaxHeartRate(bpm: Int) { dataStore.edit { it[KEY_MAX_HR] = bpm.toString() } }
     suspend fun setLastSyncTime(epochSeconds: Long) { dataStore.edit { it[KEY_LAST_SYNC_TIME] = epochSeconds } }
     suspend fun setDataDaysBack(days: Int) { dataStore.edit { it[KEY_DATA_DAYS_BACK] = days } }
+    suspend fun setHcChangesToken(token: String?) {
+        dataStore.edit { if (token == null) it.remove(KEY_HC_CHANGES_TOKEN) else it[KEY_HC_CHANGES_TOKEN] = token }
+    }
+    suspend fun setBackgroundSyncEnabled(enabled: Boolean) { dataStore.edit { it[KEY_BACKGROUND_SYNC_ENABLED] = enabled } }
+    suspend fun setLastBackgroundSyncTime(epochSeconds: Long) { dataStore.edit { it[KEY_LAST_BG_SYNC_TIME] = epochSeconds } }
 }

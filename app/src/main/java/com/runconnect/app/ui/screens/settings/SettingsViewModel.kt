@@ -7,6 +7,7 @@ import com.runconnect.app.data.healthconnect.HealthConnectManager
 import com.runconnect.app.data.preferences.AppPreferences
 import com.runconnect.app.data.remote.garmin.GarminAuthManager
 import com.runconnect.app.data.repository.ActivityRepository
+import com.runconnect.app.data.sync.SyncScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,6 +32,10 @@ data class SettingsUiState(
     val lastSyncLabel: String = "Never",
     val isSyncing: Boolean = false,
     val dataDaysBack: Int = 90,
+    val backgroundSyncEnabled: Boolean = false,
+    val hcChangesTokenPresent: Boolean = false,
+    val cacheActivityCount: Int = 0,
+    val lastBackgroundSyncLabel: String = "Never",
 ) {
     val healthConnectStatusLabel: String get() = when (healthConnectSdkStatus) {
         HealthConnectClient.SDK_AVAILABLE -> "Available (SDK ${healthConnectSdkStatus})"
@@ -46,6 +51,7 @@ class SettingsViewModel @Inject constructor(
     private val garminAuthManager: GarminAuthManager,
     private val healthConnectManager: HealthConnectManager,
     private val activityRepository: ActivityRepository,
+    private val syncScheduler: SyncScheduler,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -77,6 +83,21 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             appPreferences.dataDaysBack.collect { days ->
                 _uiState.value = _uiState.value.copy(dataDaysBack = days)
+            }
+        }
+        viewModelScope.launch {
+            appPreferences.backgroundSyncEnabled.collect { enabled ->
+                _uiState.value = _uiState.value.copy(backgroundSyncEnabled = enabled)
+            }
+        }
+        viewModelScope.launch {
+            appPreferences.hcChangesToken.collect { token ->
+                _uiState.value = _uiState.value.copy(hcChangesTokenPresent = token != null)
+            }
+        }
+        viewModelScope.launch {
+            appPreferences.lastBackgroundSyncTime.collect { epochSeconds ->
+                _uiState.value = _uiState.value.copy(lastBackgroundSyncLabel = formatLastSync(epochSeconds))
             }
         }
         viewModelScope.launch { refreshPermissionsInternal() }
@@ -117,7 +138,13 @@ class SettingsViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(
             isSyncing = false,
             lastSyncLabel = formatLastSync(syncEpoch),
+            cacheActivityCount = activityRepository.cacheSize,
         )
+    }
+
+    fun setBackgroundSyncEnabled(enabled: Boolean) = viewModelScope.launch {
+        appPreferences.setBackgroundSyncEnabled(enabled)
+        if (enabled) syncScheduler.scheduleBackgroundSync() else syncScheduler.cancelBackgroundSync()
     }
 
     fun setDataDaysBack(days: Int) = viewModelScope.launch {
@@ -138,6 +165,7 @@ class SettingsViewModel @Inject constructor(
             healthConnectPermissionsGranted = required.all { it in granted },
             healthConnectGrantedCount = granted.count { it in required },
             healthConnectRequiredCount = required.size,
+            cacheActivityCount = activityRepository.cacheSize,
         )
     }
 

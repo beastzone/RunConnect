@@ -2,6 +2,7 @@ package com.runconnect.app.data.repository
 
 import com.runconnect.app.data.healthconnect.HealthConnectManager
 import com.runconnect.app.data.healthconnect.RouteResult
+import kotlinx.coroutines.flow.first
 import com.runconnect.app.data.preferences.AppPreferences
 import com.runconnect.app.domain.model.Activity
 import kotlinx.coroutines.flow.Flow
@@ -19,6 +20,8 @@ class ActivityRepository @Inject constructor(
     private val cache = mutableListOf<Activity>()
     private var cacheTime: Instant? = null
 
+    val cacheSize: Int get() = cache.size
+
     fun getActivities(
         daysBack: Int = 90,
         forceRefresh: Boolean = false,
@@ -28,9 +31,27 @@ class ActivityRepository @Inject constructor(
             now.isAfter(it.plus(5, ChronoUnit.MINUTES))
         } ?: true
 
+        // Fresh cache — return immediately (no HC calls)
         if (!forceRefresh && !cacheExpired && cache.isNotEmpty()) {
             emit(Result.success(cache.toList()))
             return@flow
+        }
+
+        // Stale cache — check HC change log before doing a full 6-call fetch.
+        // If nothing changed, renew the token and extend the cache lifetime for free.
+        if (!forceRefresh && cache.isNotEmpty()) {
+            val savedToken = appPreferences.hcChangesToken.first()
+            if (savedToken != null) {
+                val summary = healthConnectManager.processChanges(savedToken)
+                if (summary != null && !summary.hasExerciseChanges) {
+                    appPreferences.setHcChangesToken(summary.newToken)
+                    cacheTime = now
+                    emit(Result.success(cache.toList()))
+                    return@flow
+                }
+                if (summary != null) appPreferences.setHcChangesToken(summary.newToken)
+                // summary == null means token expired — fall through to full fetch
+            }
         }
 
         val fetchResult = runCatching {
@@ -43,6 +64,8 @@ class ActivityRepository @Inject constructor(
             cache.addAll(activities)
             cacheTime = now
             appPreferences.setLastSyncTime(now.epochSecond)
+            val newToken = healthConnectManager.getChangesToken()
+            if (newToken != null) appPreferences.setHcChangesToken(newToken)
             emit(Result.success(activities))
         } else {
             val e = fetchResult.exceptionOrNull()!!

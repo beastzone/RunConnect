@@ -16,6 +16,8 @@ import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.SpeedRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.WeightRecord
+import androidx.health.connect.client.changes.UpsertionChange
+import androidx.health.connect.client.request.ChangesTokenRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.records.ExerciseRouteResult
 import androidx.health.connect.client.time.TimeRangeFilter
@@ -35,6 +37,8 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 import javax.inject.Inject
 import javax.inject.Singleton
+
+data class ChangeSummary(val hasExerciseChanges: Boolean, val newToken: String)
 
 data class RouteResult(
     val points: List<RoutePoint> = emptyList(),
@@ -312,6 +316,31 @@ class HealthConnectManager @Inject constructor(
         ).records.map {
             BodyMetricsSample(timestamp = it.time, weightKg = it.weight.inKilograms, bodyFatPercent = null)
         }
+    }
+
+    // Returns a token scoped to ExerciseSessionRecord changes. Null if HC unavailable.
+    suspend fun getChangesToken(): String? {
+        val c = client ?: return null
+        return runCatching {
+            c.getChangesToken(ChangesTokenRequest(recordTypes = setOf(ExerciseSessionRecord::class)))
+        }.getOrNull()
+    }
+
+    // Drains the change log since `token`. Null means the token expired — caller should do a full fetch.
+    suspend fun processChanges(token: String): ChangeSummary? {
+        val c = client ?: return null
+        return runCatching {
+            var currentToken = token
+            var hasChanges = false
+            var hasMore = true
+            while (hasMore) {
+                val response = c.getChanges(currentToken)
+                if (!hasChanges) hasChanges = response.changes.any { it is UpsertionChange }
+                currentToken = response.nextChangesToken
+                hasMore = response.hasMore
+            }
+            ChangeSummary(hasExerciseChanges = hasChanges, newToken = currentToken)
+        }.getOrNull()
     }
 
     suspend fun readBodyFatHistory(days: Int = 90): List<BodyMetricsSample> {

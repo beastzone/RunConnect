@@ -236,6 +236,11 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
             }
         }
 
+        // --- Background Sync + Diagnostics ---
+        item {
+            SyncSection(state = state, viewModel = viewModel)
+        }
+
         // --- Data History ---
         item {
             DataHistorySection(state = state, viewModel = viewModel)
@@ -299,6 +304,51 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SyncSection(state: SettingsUiState, viewModel: SettingsViewModel) {
+    SettingsSection("Background Sync & Diagnostics") {
+        SettingsRow(
+            label = "Background Sync",
+            description = "Check Health Connect every 15 minutes",
+        ) {
+            Switch(
+                checked = state.backgroundSyncEnabled,
+                onCheckedChange = { viewModel.setBackgroundSyncEnabled(it) },
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = TealPrimary,
+                    checkedTrackColor = TealPrimary.copy(alpha = 0.4f),
+                ),
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        StatusRow(
+            label = "Change Token",
+            value = if (state.hcChangesTokenPresent) "Present (incremental sync active)" else "None (full fetch on next sync)",
+            valueColor = if (state.hcChangesTokenPresent) TealPrimary else TextSecondary,
+        )
+        Spacer(Modifier.height(4.dp))
+        StatusRow(
+            label = "Cached Activities",
+            value = "${state.cacheActivityCount}",
+            valueColor = TextSecondary,
+        )
+        Spacer(Modifier.height(4.dp))
+        StatusRow(
+            label = "Last Manual Sync",
+            value = state.lastSyncLabel,
+            valueColor = TextSecondary,
+        )
+        if (state.backgroundSyncEnabled) {
+            Spacer(Modifier.height(4.dp))
+            StatusRow(
+                label = "Last Background Sync",
+                value = state.lastBackgroundSyncLabel,
+                valueColor = TextSecondary,
+            )
         }
     }
 }

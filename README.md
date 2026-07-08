@@ -50,6 +50,7 @@ Download the latest APK from the [Releases](https://github.com/beastzone/RunConn
 
 ### Settings
 - **Health Connect** — tap "Grant Permissions" (uses OS permission dialog on Android 14+, HC app dialog on Android 13-); shows SDK status and granted/required count; "Open Health Connect App" fallback button; **Last Synced** timestamp with **Sync Now** button
+- **Background Sync & Diagnostics** — toggle automatic HC polling every 15 min (WorkManager); shows incremental change token status, cached activity count, last manual and background sync times; uses HC change tokens to skip full 6-call fetch when nothing changed
 - **Data History** — choose how far back to load from HC: 1 Day / 1 Week / 1 Month / 3 Months / 6 Months / 1 Year (default 3 months); changing this automatically re-fetches with the new range
 - **Units** — toggle miles/km, lbs/kg
 - **Max heart rate** — used to compute HR zone boundaries
@@ -100,7 +101,7 @@ Download the latest APK from the [Releases](https://github.com/beastzone/RunConn
 | Maps | Mapbox Maps SDK v11 (3D terrain) |
 | Charts | Custom Canvas with touch scrubbing and axis labels (elevation, pace, HR, resting HR, HRV, weight, body fat) |
 | Networking | Retrofit + OkHttp + Moshi |
-| Storage | DataStore Preferences |
+| Storage | DataStore Preferences + WorkManager (background sync) |
 | Race predictions | Riegel formula |
 | Insights | Rule-based engine (sleep, training load, recovery, consistency) |
 | Build | GitHub Actions (Gradle 8.12, AGP 8.9.1, compileSdk 36) |
