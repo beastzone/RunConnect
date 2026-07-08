@@ -3,7 +3,7 @@ package com.runconnect.app.ui.screens.settings
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
-import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -44,10 +44,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
-import androidx.core.content.PermissionChecker
 import androidx.health.connect.client.HealthConnectClient
+import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -65,14 +63,25 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    // Refresh permissions every time this screen comes back into focus
-    // (catches the case where user went to HC app and granted there)
+    // Refresh permissions whenever the screen resumes — catches the case where
+    // the user went to the HC app manually to grant permissions and came back.
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) viewModel.refreshPermissions()
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    // Official documented contract from Health Connect SDK.
+    // Requires the manifest to have both:
+    //   - ACTION_SHOW_PERMISSIONS_RATIONALE (Android 13-)
+    //   - VIEW_PERMISSION_USAGE + HEALTH_PERMISSIONS activity-alias (Android 14+)
+    // Without the Android 14+ activity-alias, HC silently refuses to show the dialog.
+    val permissionLauncher = rememberLauncherForActivityResult(
+        PermissionController.createRequestPermissionResultContract()
+    ) { granted ->
+        viewModel.refreshPermissions()
     }
 
     var garminKey by remember { mutableStateOf("") }
@@ -149,29 +158,11 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
 
                     Button(
                         onClick = {
-                            Toast.makeText(context, "Requesting HC permissions…", Toast.LENGTH_SHORT).show()
-                            val activity = context as? ComponentActivity
-                            val permissions = viewModel.requiredPermissions.toTypedArray()
-
-                            // Check if we're in a permanently-denied state where the system
-                            // won't show a dialog — if so, go straight to the HC permissions page
-                            val allPermanentlyDenied = activity != null && permissions.all { perm ->
-                                ContextCompat.checkSelfPermission(context, perm) != PermissionChecker.PERMISSION_GRANTED &&
-                                    !ActivityCompat.shouldShowRequestPermissionRationale(activity, perm)
-                            }
-
-                            if (allPermanentlyDenied || activity == null) {
-                                // Permissions were permanently denied — must open settings
-                                Toast.makeText(context, "Opening Health Connect permissions page…", Toast.LENGTH_SHORT).show()
+                            try {
+                                permissionLauncher.launch(viewModel.requiredPermissions)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Could not open dialog (${e.message}) — use button below", Toast.LENGTH_LONG).show()
                                 openHealthConnectPermissionsPage(context)
-                            } else {
-                                // Use the raw Activity.requestPermissions() — bypasses all launcher machinery
-                                try {
-                                    ActivityCompat.requestPermissions(activity, permissions, HC_PERMISSIONS_REQUEST_CODE)
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "requestPermissions failed: ${e.message}", Toast.LENGTH_LONG).show()
-                                    openHealthConnectPermissionsPage(context)
-                                }
                             }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = TealPrimary),
@@ -182,6 +173,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
 
                     Spacer(Modifier.height(8.dp))
 
+                    // Direct fallback: always available, goes to RunConnect's page in HC app
                     OutlinedButton(
                         onClick = { openHealthConnectPermissionsPage(context) },
                         modifier = Modifier.fillMaxWidth(),
@@ -197,9 +189,9 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                             HealthConnectClient.SDK_UNAVAILABLE ->
                                 "Health Connect is not installed. Install it from the Play Store, then tap Grant Permissions."
                             HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED ->
-                                "Health Connect needs an update. Open the Play Store, update it, then tap Grant Permissions."
+                                "Health Connect needs an update. Update it from the Play Store, then tap Grant Permissions."
                             else ->
-                                "Grant Permissions opens the system dialog. If permissions were previously denied, it goes straight to the Health Connect settings page — toggle each permission on there."
+                                "Tap Grant Permissions for the system dialog. If it was previously denied and won't show, tap Open Health Connect App and toggle permissions on manually."
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = TextSecondary,
@@ -270,20 +262,14 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
     }
 }
 
-private const val HC_PERMISSIONS_REQUEST_CODE = 1001
-
 private fun openHealthConnectPermissionsPage(context: android.content.Context) {
     val packageName = context.packageName
     val intents = listOf(
-        // Android 14+: system health permissions management for our app
+        // Directly open RunConnect's permissions page in Health Connect
         Intent("android.health.connect.action.MANAGE_HEALTH_PERMISSIONS")
             .putExtra(Intent.EXTRA_PACKAGE_NAME, packageName)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-        // HC SDK action name variant
-        Intent("androidx.health.ACTION_MANAGE_HEALTH_PERMISSIONS")
-            .putExtra(Intent.EXTRA_PACKAGE_NAME, packageName)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-        // Open the HC app main page
+        // Open HC app main page
         context.packageManager.getLaunchIntentForPackage("com.google.android.apps.healthdata")
             ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         // Play Store as last resort

@@ -24,12 +24,8 @@
         <intent>
             <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
         </intent>
-        <!-- Needed to startActivity with the direct HC permissions management screen -->
         <intent>
             <action android:name="android.health.connect.action.MANAGE_HEALTH_PERMISSIONS" />
-        </intent>
-        <intent>
-            <action android:name="androidx.health.ACTION_MANAGE_HEALTH_PERMISSIONS" />
         </intent>
     </queries>
 
@@ -54,9 +50,7 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Required by Health Connect: HC queries for this activity before showing the
-                 permission dialog. The DEFAULT category is mandatory — without it,
-                 queryIntentActivities() returns nothing and HC silently skips the dialog. -->
+            <!-- Android 13 and below: HC privacy policy link in permission dialog -->
             <intent-filter>
                 <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -72,6 +66,22 @@
             </intent-filter>
         </activity>
 
+        <!--
+            Android 14+ REQUIRED: Health Connect validates this activity-alias exists before
+            showing the permission dialog. Without it, HC silently refuses to open the dialog.
+            Points at MainActivity so the privacy policy link just opens the app.
+            android:permission guards it so only the system can invoke it.
+        -->
+        <activity-alias
+            android:name=".PermissionsRationaleActivity"
+            android:exported="true"
+            android:targetActivity=".MainActivity"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+            </intent-filter>
+        </activity-alias>
 
     </application>
 

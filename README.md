@@ -108,7 +108,7 @@ No local Android Studio required. Every push to `main` triggers a GitHub Actions
 ## Planned / In Progress
 
 - [ ] GPS route display on 3D map (stubbed — Health Connect 1.1.0 `readExerciseRoute()` API)
-- [x] Health Connect permission grant — uses `ActivityCompat.requestPermissions()` (raw system API) on first attempt; detects permanently-denied state via `shouldShowRequestPermissionRationale()` and redirects to HC permissions page; `DisposableEffect` lifecycle observer refreshes status when returning from HC app; manifest queries block covers all HC intent actions
+- [x] Health Connect permission grant — manifest now has both required privacy-policy declarations: `ACTION_SHOW_PERMISSIONS_RATIONALE` (Android 13-) and `VIEW_PERMISSION_USAGE` / `HEALTH_PERMISSIONS` activity-alias (Android 14+, the missing piece that caused HC to silently block the dialog); `DisposableEffect` lifecycle observer refreshes status on resume
 - [ ] Withings body composition (weight, body fat) via Health Connect
 - [ ] VO2 max trend chart
 - [ ] Training load / chronic load calculations
