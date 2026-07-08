@@ -2,10 +2,8 @@ package com.runconnect.app.ui.screens.settings
 
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -31,6 +29,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,12 +39,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import androidx.core.content.PermissionChecker
 import androidx.health.connect.client.HealthConnectClient
-import androidx.health.connect.client.PermissionController
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.runconnect.app.ui.theme.Background
 import com.runconnect.app.ui.theme.BorderColor
@@ -59,18 +63,16 @@ import com.runconnect.app.ui.theme.TextSecondary
 fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
 
-    // Android 14+ (API 34): health permissions are OS-level — use standard RequestMultiplePermissions.
-    // Android 13 and below: Health Connect is a standalone app — use HC's own contract.
-    val android14PermLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) {
-        viewModel.refreshPermissions()
-    }
-    val hcContractLauncher = rememberLauncherForActivityResult(
-        PermissionController.createRequestPermissionResultContract()
-    ) {
-        viewModel.refreshPermissions()
+    // Refresh permissions every time this screen comes back into focus
+    // (catches the case where user went to HC app and granted there)
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) viewModel.refreshPermissions()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     var garminKey by remember { mutableStateOf("") }
@@ -147,18 +149,29 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
 
                     Button(
                         onClick = {
-                            val permissions = viewModel.requiredPermissions
-                            try {
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                                    // Android 14+: health perms are OS-level, use standard contract
-                                    android14PermLauncher.launch(permissions.toTypedArray())
-                                } else {
-                                    // Android 13-: health perms are handled by the HC app
-                                    hcContractLauncher.launch(permissions)
+                            Toast.makeText(context, "Requesting HC permissions…", Toast.LENGTH_SHORT).show()
+                            val activity = context as? ComponentActivity
+                            val permissions = viewModel.requiredPermissions.toTypedArray()
+
+                            // Check if we're in a permanently-denied state where the system
+                            // won't show a dialog — if so, go straight to the HC permissions page
+                            val allPermanentlyDenied = activity != null && permissions.all { perm ->
+                                ContextCompat.checkSelfPermission(context, perm) != PermissionChecker.PERMISSION_GRANTED &&
+                                    !ActivityCompat.shouldShowRequestPermissionRationale(activity, perm)
+                            }
+
+                            if (allPermanentlyDenied || activity == null) {
+                                // Permissions were permanently denied — must open settings
+                                Toast.makeText(context, "Opening Health Connect permissions page…", Toast.LENGTH_SHORT).show()
+                                openHealthConnectPermissionsPage(context)
+                            } else {
+                                // Use the raw Activity.requestPermissions() — bypasses all launcher machinery
+                                try {
+                                    ActivityCompat.requestPermissions(activity, permissions, HC_PERMISSIONS_REQUEST_CODE)
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "requestPermissions failed: ${e.message}", Toast.LENGTH_LONG).show()
+                                    openHealthConnectPermissionsPage(context)
                                 }
-                            } catch (e: Exception) {
-                                Toast.makeText(context, "Error: ${e.message} — opening HC app instead", Toast.LENGTH_LONG).show()
-                                openHealthConnectApp(context)
                             }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = TealPrimary),
@@ -170,7 +183,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                     Spacer(Modifier.height(8.dp))
 
                     OutlinedButton(
-                        onClick = { openHealthConnectApp(context) },
+                        onClick = { openHealthConnectPermissionsPage(context) },
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = TealPrimary),
                         border = androidx.compose.foundation.BorderStroke(1.dp, TealPrimary),
@@ -184,9 +197,9 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                             HealthConnectClient.SDK_UNAVAILABLE ->
                                 "Health Connect is not installed. Install it from the Play Store, then tap Grant Permissions."
                             HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED ->
-                                "Health Connect needs an update. Open the Play Store, update Health Connect, then tap Grant Permissions."
+                                "Health Connect needs an update. Open the Play Store, update it, then tap Grant Permissions."
                             else ->
-                                "Tap Grant Permissions to open the system health permissions dialog. If it still doesn't appear, tap Open Health Connect App and grant RunConnect access manually."
+                                "Grant Permissions opens the system dialog. If permissions were previously denied, it goes straight to the Health Connect settings page — toggle each permission on there."
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = TextSecondary,
@@ -257,14 +270,23 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
     }
 }
 
-private fun openHealthConnectApp(context: android.content.Context) {
+private const val HC_PERMISSIONS_REQUEST_CODE = 1001
+
+private fun openHealthConnectPermissionsPage(context: android.content.Context) {
     val packageName = context.packageName
     val intents = listOf(
+        // Android 14+: system health permissions management for our app
+        Intent("android.health.connect.action.MANAGE_HEALTH_PERMISSIONS")
+            .putExtra(Intent.EXTRA_PACKAGE_NAME, packageName)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        // HC SDK action name variant
         Intent("androidx.health.ACTION_MANAGE_HEALTH_PERMISSIONS")
             .putExtra(Intent.EXTRA_PACKAGE_NAME, packageName)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        // Open the HC app main page
         context.packageManager.getLaunchIntentForPackage("com.google.android.apps.healthdata")
             ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        // Play Store as last resort
         Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=com.google.android.apps.healthdata"))
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
     )

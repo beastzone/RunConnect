@@ -24,6 +24,13 @@
         <intent>
             <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
         </intent>
+        <!-- Needed to startActivity with the direct HC permissions management screen -->
+        <intent>
+            <action android:name="android.health.connect.action.MANAGE_HEALTH_PERMISSIONS" />
+        </intent>
+        <intent>
+            <action android:name="androidx.health.ACTION_MANAGE_HEALTH_PERMISSIONS" />
+        </intent>
     </queries>
 
     <application
