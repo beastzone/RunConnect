@@ -150,6 +150,7 @@ class GarminAuthManager @Inject constructor(
                 prefs[KEY_ACCESS_TOKEN] = accessToken
                 prefs[KEY_TOKEN_SECRET] = accessSecret
             }
+            Unit
         }
     }
 

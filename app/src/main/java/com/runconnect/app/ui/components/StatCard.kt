@@ -71,7 +71,7 @@ fun StatCard(
                 )
             }
             Spacer(Modifier.height(10.dp))
-            Row(verticalAlignment = Alignment.Baseline) {
+            Row(verticalAlignment = Alignment.Bottom) {
                 Text(
                     text = value,
                     style = MaterialTheme.typography.headlineMedium.copy(

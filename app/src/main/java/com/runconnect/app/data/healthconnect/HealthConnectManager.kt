@@ -10,7 +10,6 @@ import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.HeartRateRecord
 import androidx.health.connect.client.records.PowerRecord
 import androidx.health.connect.client.records.SleepSessionRecord
-import androidx.health.connect.client.records.SleepStageRecord
 import androidx.health.connect.client.records.SpeedRecord
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
@@ -45,7 +44,6 @@ class HealthConnectManager @Inject constructor(
         HealthPermission.getReadPermission(ExerciseSessionRecord::class),
         HealthPermission.getReadPermission(HeartRateRecord::class),
         HealthPermission.getReadPermission(SleepSessionRecord::class),
-        HealthPermission.getReadPermission(SleepStageRecord::class),
         HealthPermission.getReadPermission(SpeedRecord::class),
         HealthPermission.getReadPermission(DistanceRecord::class),
         HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class),
@@ -82,7 +80,7 @@ class HealthConnectManager @Inject constructor(
             val distance = readTotalDistance(c, session.startTime, session.endTime)
             val calories = readCalories(c, session.startTime, session.endTime)
             val elevation = readElevationGain(c, session.startTime, session.endTime)
-            val route = session.route?.locations?.map { loc ->
+            val route = session.exerciseRoute?.route?.map { loc ->
                 RoutePoint(
                     latitude = loc.latitude,
                     longitude = loc.longitude,

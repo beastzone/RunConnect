@@ -79,7 +79,7 @@ fun MapboxRouteView(
                     +rasterDemSource("terrain-source") {
                         url("mapbox://mapbox.mapbox-terrain-dem-v1")
                         tileSize(512)
-                        maxzoom(14.0)
+                        maxzoom(14L)
                     }
                     +terrain("terrain-source") {
                         exaggeration(1.5)
