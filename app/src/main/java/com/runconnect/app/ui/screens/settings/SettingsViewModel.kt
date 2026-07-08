@@ -6,12 +6,15 @@ import androidx.lifecycle.viewModelScope
 import com.runconnect.app.data.healthconnect.HealthConnectManager
 import com.runconnect.app.data.preferences.AppPreferences
 import com.runconnect.app.data.remote.garmin.GarminAuthManager
+import com.runconnect.app.data.repository.ActivityRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.ZoneId
 import javax.inject.Inject
 
 data class SettingsUiState(
@@ -25,6 +28,9 @@ data class SettingsUiState(
     val healthConnectPermissionsGranted: Boolean = false,
     val healthConnectGrantedCount: Int = 0,
     val healthConnectRequiredCount: Int = 0,
+    val lastSyncLabel: String = "Never",
+    val isSyncing: Boolean = false,
+    val dataDaysBack: Int = 90,
 ) {
     val healthConnectStatusLabel: String get() = when (healthConnectSdkStatus) {
         HealthConnectClient.SDK_AVAILABLE -> "Available (SDK ${healthConnectSdkStatus})"
@@ -39,6 +45,7 @@ class SettingsViewModel @Inject constructor(
     private val appPreferences: AppPreferences,
     private val garminAuthManager: GarminAuthManager,
     private val healthConnectManager: HealthConnectManager,
+    private val activityRepository: ActivityRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -61,6 +68,16 @@ class SettingsViewModel @Inject constructor(
                     healthConnectSdkStatus = healthConnectManager.sdkStatus,
                 )
             }.collect {}
+        }
+        viewModelScope.launch {
+            appPreferences.lastSyncTime.collect { epochSeconds ->
+                _uiState.value = _uiState.value.copy(lastSyncLabel = formatLastSync(epochSeconds))
+            }
+        }
+        viewModelScope.launch {
+            appPreferences.dataDaysBack.collect { days ->
+                _uiState.value = _uiState.value.copy(dataDaysBack = days)
+            }
         }
         viewModelScope.launch { refreshPermissionsInternal() }
     }
@@ -89,6 +106,24 @@ class SettingsViewModel @Inject constructor(
         garminAuthManager.signOut()
     }
 
+    fun syncNow() = viewModelScope.launch {
+        _uiState.value = _uiState.value.copy(isSyncing = true)
+        val daysBack = appPreferences.dataDaysBack.first()
+        activityRepository.invalidateCache()
+        runCatching {
+            activityRepository.getActivities(daysBack = daysBack, forceRefresh = true).first()
+        }
+        val syncEpoch = appPreferences.lastSyncTime.first()
+        _uiState.value = _uiState.value.copy(
+            isSyncing = false,
+            lastSyncLabel = formatLastSync(syncEpoch),
+        )
+    }
+
+    fun setDataDaysBack(days: Int) = viewModelScope.launch {
+        appPreferences.setDataDaysBack(days)
+    }
+
     val requiredPermissions: Set<String>
         get() = healthConnectManager.requiredPermissions
 
@@ -104,5 +139,23 @@ class SettingsViewModel @Inject constructor(
             healthConnectGrantedCount = granted.count { it in required },
             healthConnectRequiredCount = required.size,
         )
+    }
+
+    private fun formatLastSync(epochSeconds: Long?): String {
+        if (epochSeconds == null) return "Never"
+        val now = Instant.now().epochSecond
+        val diff = now - epochSeconds
+        return when {
+            diff < 60 -> "Just now"
+            diff < 3600 -> "${diff / 60}m ago"
+            diff < 86400 -> "${diff / 3600}h ago"
+            else -> {
+                val date = Instant.ofEpochSecond(epochSeconds)
+                    .atZone(ZoneId.systemDefault())
+                    .toLocalDate()
+                val month = date.month.name.lowercase().replaceFirstChar { it.uppercase() }.substring(0, 3)
+                "$month ${date.dayOfMonth}"
+            }
+        }
     }
 }

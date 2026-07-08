@@ -16,6 +16,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -24,6 +25,7 @@ import javax.inject.Inject
 
 data class DashboardUiState(
     val isLoading: Boolean = true,
+    val isRefreshing: Boolean = false,
     val error: String? = null,
     val recentActivities: List<Activity> = emptyList(),
     val weeklyDistanceKm: Double = 0.0,
@@ -60,17 +62,31 @@ class DashboardViewModel @Inject constructor(
 
     init {
         loadData()
+        // Re-fetch when the data range preference changes
+        viewModelScope.launch {
+            appPreferences.dataDaysBack.drop(1).collect {
+                activityRepository.invalidateCache()
+                _uiState.value = _uiState.value.copy(isRefreshing = true)
+                loadData(forceRefresh = true)
+            }
+        }
     }
 
-    fun refresh() = loadData(forceRefresh = true)
+    fun refresh() {
+        _uiState.value = _uiState.value.copy(isRefreshing = true)
+        loadData(forceRefresh = true)
+    }
 
     private fun loadData(forceRefresh: Boolean = false) {
         viewModelScope.launch {
             val useImperial = appPreferences.useImperial.first()
-            _uiState.value = _uiState.value.copy(isLoading = true, error = null, useImperial = useImperial)
+            val daysBack = appPreferences.dataDaysBack.first()
+            if (!forceRefresh) {
+                _uiState.value = _uiState.value.copy(isLoading = true, error = null, useImperial = useImperial)
+            }
 
             // Load activities via flow (respects cache)
-            activityRepository.getActivities(daysBack = 90, forceRefresh = forceRefresh)
+            activityRepository.getActivities(daysBack = daysBack, forceRefresh = forceRefresh)
                 .collectLatest { result ->
                     result.onSuccess { activities ->
                         val weekStart = LocalDate.now().minusDays(7)
@@ -101,6 +117,7 @@ class DashboardViewModel @Inject constructor(
 
                         _uiState.value = _uiState.value.copy(
                             isLoading = false,
+                            isRefreshing = false,
                             recentActivities = activities.take(5),
                             weeklyDistanceKm = weekActivities.sumOf { it.distanceMeters } / 1000.0,
                             weeklyActivityCount = weekActivities.size,
@@ -120,6 +137,7 @@ class DashboardViewModel @Inject constructor(
                     }.onFailure { e ->
                         _uiState.value = _uiState.value.copy(
                             isLoading = false,
+                            isRefreshing = false,
                             error = e.message ?: "Failed to load activities",
                         )
                     }

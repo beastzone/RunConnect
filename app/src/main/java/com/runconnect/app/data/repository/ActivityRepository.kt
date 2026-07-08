@@ -2,6 +2,7 @@ package com.runconnect.app.data.repository
 
 import com.runconnect.app.data.healthconnect.HealthConnectManager
 import com.runconnect.app.data.healthconnect.RouteResult
+import com.runconnect.app.data.preferences.AppPreferences
 import com.runconnect.app.domain.model.Activity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -13,6 +14,7 @@ import javax.inject.Singleton
 @Singleton
 class ActivityRepository @Inject constructor(
     private val healthConnectManager: HealthConnectManager,
+    private val appPreferences: AppPreferences,
 ) {
     private val cache = mutableListOf<Activity>()
     private var cacheTime: Instant? = null
@@ -31,15 +33,19 @@ class ActivityRepository @Inject constructor(
             return@flow
         }
 
-        runCatching {
+        val fetchResult = runCatching {
             val startTime = now.minus(daysBack.toLong(), ChronoUnit.DAYS)
             healthConnectManager.readActivities(startTime, now)
-        }.onSuccess { activities ->
+        }
+        if (fetchResult.isSuccess) {
+            val activities = fetchResult.getOrThrow()
             cache.clear()
             cache.addAll(activities)
             cacheTime = now
+            appPreferences.setLastSyncTime(now.epochSecond)
             emit(Result.success(activities))
-        }.onFailure { e ->
+        } else {
+            val e = fetchResult.exceptionOrNull()!!
             if (cache.isNotEmpty()) {
                 emit(Result.success(cache.toList()))
             } else {

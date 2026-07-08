@@ -7,6 +7,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,6 +24,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -152,6 +158,36 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                             else "${state.healthConnectGrantedCount}/${state.healthConnectRequiredCount} granted",
                     valueColor = if (state.healthConnectPermissionsGranted) TealPrimary else CoralAccent,
                 )
+                Spacer(Modifier.height(4.dp))
+                StatusRow(
+                    label = "Last Synced",
+                    value = state.lastSyncLabel,
+                    valueColor = TextSecondary,
+                )
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (state.isSyncing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = TealPrimary,
+                            strokeWidth = 2.dp,
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Syncing…", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                    } else {
+                        OutlinedButton(
+                            onClick = { viewModel.syncNow() },
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = TealPrimary),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, TealPrimary),
+                        ) {
+                            Text("Sync Now")
+                        }
+                    }
+                }
 
                 if (!state.healthConnectPermissionsGranted) {
                     Spacer(Modifier.height(12.dp))
@@ -198,6 +234,11 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                     )
                 }
             }
+        }
+
+        // --- Data History ---
+        item {
+            DataHistorySection(state = state, viewModel = viewModel)
         }
 
         // --- Garmin Connect ---
@@ -257,6 +298,50 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                         Text("Disconnect Garmin")
                     }
                 }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun DataHistorySection(state: SettingsUiState, viewModel: SettingsViewModel) {
+    val ranges = listOf(
+        1 to "1 Day",
+        7 to "1 Week",
+        30 to "1 Month",
+        90 to "3 Months",
+        180 to "6 Months",
+        365 to "1 Year",
+    )
+    SettingsSection("Data History") {
+        Text(
+            "How far back to load data from Health Connect",
+            style = MaterialTheme.typography.bodySmall,
+            color = TextSecondary,
+        )
+        Spacer(Modifier.height(12.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            ranges.forEach { (days, label) ->
+                FilterChip(
+                    selected = state.dataDaysBack == days,
+                    onClick = { viewModel.setDataDaysBack(days) },
+                    label = { Text(label, style = MaterialTheme.typography.labelMedium) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = TealPrimary.copy(alpha = 0.2f),
+                        selectedLabelColor = TealPrimary,
+                        labelColor = TextSecondary,
+                    ),
+                    border = FilterChipDefaults.filterChipBorder(
+                        enabled = true,
+                        selected = state.dataDaysBack == days,
+                        selectedBorderColor = TealPrimary,
+                        borderColor = BorderColor,
+                    ),
+                )
             }
         }
     }

@@ -18,6 +18,7 @@ Download the latest APK from the [Releases](https://github.com/beastzone/RunConn
 - **AI-style insights** — rule-based coaching cards: training load warnings (10% rule), sleep duration/quality, recovery alerts (elevated resting HR, low HRV), consistency streaks
 - Weekly summary: distance, activity count, time, day streak
 - 5 most recent activities with type, distance, duration, pace, heart rate
+- **Pull-to-refresh** — swipe down to fetch the latest data from Health Connect
 
 ### Activities
 - Full list of runs, hikes, walks, cycles from the past 90 days
@@ -47,7 +48,8 @@ Download the latest APK from the [Releases](https://github.com/beastzone/RunConn
 - Measurement history table
 
 ### Settings
-- **Health Connect** — tap "Grant Permissions" (uses OS permission dialog on Android 14+, HC app dialog on Android 13-); shows SDK status and granted/required count; "Open Health Connect App" fallback button
+- **Health Connect** — tap "Grant Permissions" (uses OS permission dialog on Android 14+, HC app dialog on Android 13-); shows SDK status and granted/required count; "Open Health Connect App" fallback button; **Last Synced** timestamp with **Sync Now** button
+- **Data History** — choose how far back to load from HC: 1 Day / 1 Week / 1 Month / 3 Months / 6 Months / 1 Year (default 3 months); changing this automatically re-fetches with the new range
 - **Units** — toggle miles/km, lbs/kg
 - **Max heart rate** — used to compute HR zone boundaries
 - **Garmin Connect API** (optional) — Consumer Key + Secret for deeper Garmin data
