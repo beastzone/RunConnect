@@ -126,7 +126,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                     value = if (state.healthConnectPermissionsGranted) "Granted" else "Not granted",
                     valueColor = if (state.healthConnectPermissionsGranted) TealPrimary else CoralAccent,
                 )
-                if (!state.healthConnectPermissionsGranted && state.healthConnectAvailable) {
+                if (!state.healthConnectPermissionsGranted) {
                     Spacer(Modifier.height(12.dp))
                     Button(
                         onClick = { permissionLauncher.launch(viewModel.requiredPermissions) },
@@ -135,13 +135,14 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                     ) {
                         Text("Grant Permissions", color = MaterialTheme.colorScheme.background)
                     }
-                } else if (!state.healthConnectAvailable) {
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "Health Connect is not installed. Install it from the Play Store to use this app.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary,
-                    )
+                    if (!state.healthConnectAvailable) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "Health Connect may not be installed — install it from the Play Store if the button above doesn't open a dialog.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary,
+                        )
+                    }
                 }
             }
         }
