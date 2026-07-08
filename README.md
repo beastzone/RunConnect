@@ -108,6 +108,7 @@ No local Android Studio required. Every push to `main` triggers a GitHub Actions
 ## Planned / In Progress
 
 - [ ] GPS route display on 3D map (stubbed — Health Connect 1.1.0 `readExerciseRoute()` API)
+- [x] Health Connect permission grant button (fixed `PermissionController.createRequestPermissionResultContract()`)
 - [ ] Withings body composition (weight, body fat) via Health Connect
 - [ ] VO2 max trend chart
 - [ ] Training load / chronic load calculations
