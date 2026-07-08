@@ -18,6 +18,14 @@
     <uses-permission android:name="android.permission.health.READ_VO2_MAX" />
     <uses-permission android:name="android.permission.health.READ_RESTING_HEART_RATE" />
 
+    <!-- Required on Android 11+ so the app can detect the Health Connect package -->
+    <queries>
+        <package android:name="com.google.android.apps.healthdata" />
+        <intent>
+            <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+        </intent>
+    </queries>
+
     <application
         android:name=".RunConnectApp"
         android:allowBackup="true"
@@ -39,6 +47,10 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Required by Health Connect: where to send users for privacy policy -->
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
             <!-- Deep link for Garmin OAuth callback -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
@@ -50,10 +62,6 @@
             </intent-filter>
         </activity>
 
-        <!-- Declare Health Connect usage for Play Store -->
-        <activity
-            android:name="androidx.health.connect.client.PermissionController"
-            android:exported="true" />
 
     </application>
 
