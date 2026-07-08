@@ -39,11 +39,11 @@ Download the latest APK from the [Releases](https://github.com/beastzone/RunConn
 - Max HR configurable in Settings (default 190 bpm)
 
 ### Settings
-- **Health Connect** — tap "Grant Permissions" to open the Health Connect dialog; shows SDK status and how many permissions are granted. If the dialog doesn't open, tap "Open Health Connect App" to grant access manually
+- **Health Connect** — tap "Grant Permissions" to open the health permissions dialog (uses standard OS dialog on Android 14+, HC app dialog on Android 13-); shows SDK status and granted/required count. "Open Health Connect App" button as a manual fallback
 - **Units** — toggle miles/km, lbs/kg
 - **Max heart rate** — used to compute HR zone boundaries
-- **Mapbox token** — free public token from account.mapbox.com, required for 3D route maps
 - **Garmin Connect API** (optional) — enter Consumer Key + Secret from developer.garmin.com for deeper Garmin data; most data works without this via Health Connect
+- **Mapbox token** — already baked into the APK from the GitHub build; no need to enter it manually
 
 ---
 
@@ -108,7 +108,7 @@ No local Android Studio required. Every push to `main` triggers a GitHub Actions
 ## Planned / In Progress
 
 - [ ] GPS route display on 3D map (stubbed — Health Connect 1.1.0 `readExerciseRoute()` API)
-- [x] Health Connect permission grant — fixed manifest `ACTION_SHOW_PERMISSIONS_RATIONALE` missing `DEFAULT` category (root cause: HC's `queryIntentActivities()` returned nothing without it, silently blocking the dialog); added try/catch + Toast for errors, direct fallback button to open HC app manually
+- [x] Health Connect permission grant — uses `RequestMultiplePermissions` on Android 14+ (OS-level health perms) and HC contract on Android 13-; manifest `ACTION_SHOW_PERMISSIONS_RATIONALE` now has `DEFAULT` category; fallback "Open Health Connect App" button
 - [ ] Withings body composition (weight, body fat) via Health Connect
 - [ ] VO2 max trend chart
 - [ ] Training load / chronic load calculations
