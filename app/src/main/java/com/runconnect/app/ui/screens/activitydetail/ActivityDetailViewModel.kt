@@ -12,7 +12,6 @@ import com.runconnect.app.utils.RacePredictionCalculator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -25,6 +24,7 @@ data class ActivityDetailUiState(
     val paceChartData: List<Pair<Float, Float>> = emptyList(),
     val hrChartData: List<Pair<Float, Int>> = emptyList(),
     val useImperial: Boolean = false,
+    val routeLoading: Boolean = false,
 )
 
 @HiltViewModel
@@ -48,6 +48,7 @@ class ActivityDetailViewModel @Inject constructor(
             val useImperial = appPreferences.useImperial.first()
             _uiState.value = _uiState.value.copy(isLoading = true, useImperial = useImperial)
 
+            // Load activity metadata first (fast — hits cache)
             val activity = activityRepository.getActivityById(activityId)
             if (activity == null) {
                 _uiState.value = _uiState.value.copy(isLoading = false, error = "Activity not found")
@@ -65,7 +66,22 @@ class ActivityDetailViewModel @Inject constructor(
                 paceChartData = paceData,
                 hrChartData = hrData,
                 useImperial = useImperial,
+                routeLoading = true,
             )
+
+            // Load GPS route separately — may require user consent per-activity in HC
+            val activityWithRoute = runCatching {
+                activityRepository.getActivityWithRoute(activityId)
+            }.getOrNull()
+
+            if (activityWithRoute != null && activityWithRoute.route.isNotEmpty()) {
+                _uiState.value = _uiState.value.copy(
+                    activity = activityWithRoute,
+                    routeLoading = false,
+                )
+            } else {
+                _uiState.value = _uiState.value.copy(routeLoading = false)
+            }
         }
     }
 

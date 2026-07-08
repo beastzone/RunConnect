@@ -59,6 +59,15 @@ class ActivityRepository @Inject constructor(
         return runCatching { healthConnectManager.readActivityById(id) }.getOrNull()
     }
 
+    // Loads route points for a specific activity on demand (separate from the list load).
+    suspend fun getActivityWithRoute(id: String): Activity? {
+        val activity = getActivityById(id) ?: return null
+        val route = runCatching {
+            healthConnectManager.readExerciseRoute(id)
+        }.getOrDefault(emptyList())
+        return if (route.isNotEmpty()) activity.copy(route = route) else activity
+    }
+
     fun invalidateCache() {
         cache.clear()
         cacheTime = null

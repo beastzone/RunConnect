@@ -78,6 +78,11 @@ object FormatUtils {
         }
     }
 
+    private val shortDateFormatter = DateTimeFormatter.ofPattern("MMM d")
+
+    fun formatShortDate(date: LocalDate): String =
+        shortDateFormatter.format(date)
+
     fun formatRaceTime(seconds: Long): String {
         val h = seconds / 3600
         val m = (seconds % 3600) / 60

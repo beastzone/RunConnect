@@ -1,5 +1,6 @@
 package com.runconnect.app.ui.screens.heartrate
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,7 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -27,7 +27,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -36,6 +40,7 @@ import com.runconnect.app.domain.model.HrZone
 import com.runconnect.app.ui.components.SectionHeader
 import com.runconnect.app.ui.components.SmallStatItem
 import com.runconnect.app.ui.theme.Background
+import com.runconnect.app.ui.theme.BlueAccent
 import com.runconnect.app.ui.theme.CardDark
 import com.runconnect.app.ui.theme.HeartRate
 import com.runconnect.app.ui.theme.TealPrimary
@@ -51,15 +56,9 @@ import com.runconnect.app.ui.theme.ZoneThreshold
 fun HeartRateScreen(viewModel: HeartRateViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsState()
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Background),
-    ) {
+    Column(modifier = Modifier.fillMaxSize().background(Background)) {
         Column(
-            modifier = Modifier
-                .statusBarsPadding()
-                .padding(horizontal = 20.dp, vertical = 16.dp)
+            modifier = Modifier.statusBarsPadding().padding(horizontal = 20.dp, vertical = 16.dp)
         ) {
             Text(
                 "Heart Rate",
@@ -77,7 +76,7 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = hiltViewModel()) {
         }
 
         LazyColumn(contentPadding = PaddingValues(bottom = 32.dp)) {
-            // Resting HR summary
+            // Summary stats
             item {
                 Box(
                     modifier = Modifier
@@ -93,8 +92,8 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = hiltViewModel()) {
                         horizontalArrangement = Arrangement.SpaceEvenly,
                     ) {
                         SmallStatItem(
-                            label = "Min Recorded",
-                            value = "${state.avgRestingHr} bpm",
+                            label = "Avg Resting HR",
+                            value = if (state.avgRestingHr > 0) "${state.avgRestingHr} bpm" else "--",
                             valueColor = TealPrimary,
                         )
                         SmallStatItem(
@@ -106,6 +105,20 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = hiltViewModel()) {
                             label = "HR Max Setting",
                             value = "${state.maxHrSetting} bpm",
                             valueColor = TextSecondary,
+                        )
+                    }
+                }
+            }
+
+            // Resting HR trend (from dedicated RestingHeartRateRecord)
+            if (state.restingHrHistory.size >= 3) {
+                item {
+                    Column(modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp)) {
+                        SectionHeader("Resting HR Trend (30 days)")
+                        Spacer(Modifier.height(10.dp))
+                        RestingHrChart(
+                            data = state.restingHrHistory,
+                            modifier = Modifier.fillMaxWidth().height(110.dp),
                         )
                     }
                 }
@@ -152,12 +165,44 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = hiltViewModel()) {
 }
 
 @Composable
+private fun RestingHrChart(data: List<Pair<Long, Int>>, modifier: Modifier = Modifier) {
+    val bpms = data.map { it.second }
+    val minBpm = (bpms.minOrNull() ?: 40) - 5
+    val maxBpm = (bpms.maxOrNull() ?: 80) + 5
+    val range = (maxBpm - minBpm).coerceAtLeast(1).toFloat()
+
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val pts = data.mapIndexed { i, (_, bpm) ->
+            val x = (i.toFloat() / (data.size - 1)) * w
+            val y = h - ((bpm - minBpm) / range * h * 0.8f + h * 0.1f)
+            Offset(x, y)
+        }
+
+        val fillPath = Path().apply {
+            moveTo(pts.first().x, h)
+            pts.forEach { lineTo(it.x, it.y) }
+            lineTo(pts.last().x, h)
+            close()
+        }
+        drawPath(fillPath, color = BlueAccent.copy(alpha = 0.08f))
+
+        val linePath = Path().apply {
+            pts.forEachIndexed { i, pt -> if (i == 0) moveTo(pt.x, pt.y) else lineTo(pt.x, pt.y) }
+        }
+        drawPath(linePath, color = BlueAccent, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round))
+
+        pts.forEach { pt ->
+            drawCircle(color = BlueAccent.copy(alpha = 0.4f), radius = 2.5.dp.toPx(), center = pt)
+        }
+    }
+}
+
+@Composable
 private fun HrZoneBar(summary: HeartRateZoneSummary) {
     val zoneColor = summary.zone.uiColor
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(
             summary.zone.label,
             style = MaterialTheme.typography.labelMedium,
@@ -165,11 +210,7 @@ private fun HrZoneBar(summary: HeartRateZoneSummary) {
             modifier = Modifier.width(80.dp),
         )
         Box(
-            modifier = Modifier
-                .weight(1f)
-                .height(8.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .background(CardDark)
+            modifier = Modifier.weight(1f).height(8.dp).clip(RoundedCornerShape(4.dp)).background(CardDark)
         ) {
             Box(
                 modifier = Modifier
@@ -199,12 +240,7 @@ private fun ZoneInfoRow(zone: HrZone, range: String, description: String) {
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier = Modifier
-                .size(8.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .background(zone.uiColor)
-        )
+        Box(modifier = Modifier.size(8.dp).clip(RoundedCornerShape(4.dp)).background(zone.uiColor))
         Spacer(Modifier.width(10.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(zone.label, style = MaterialTheme.typography.labelMedium.copy(color = TextPrimary))

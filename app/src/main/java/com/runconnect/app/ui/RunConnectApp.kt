@@ -26,6 +26,7 @@ import com.runconnect.app.ui.navigation.Screen
 import com.runconnect.app.ui.navigation.bottomNavItems
 import com.runconnect.app.ui.screens.activities.ActivitiesScreen
 import com.runconnect.app.ui.screens.activitydetail.ActivityDetailScreen
+import com.runconnect.app.ui.screens.bodymetrics.BodyMetricsScreen
 import com.runconnect.app.ui.screens.dashboard.DashboardScreen
 import com.runconnect.app.ui.screens.heartrate.HeartRateScreen
 import com.runconnect.app.ui.screens.settings.SettingsScreen
@@ -127,6 +128,9 @@ fun RunConnectApp() {
             }
             composable(Screen.HeartRate.route) {
                 HeartRateScreen()
+            }
+            composable(Screen.BodyMetrics.route) {
+                BodyMetricsScreen()
             }
             composable(Screen.Settings.route) {
                 SettingsScreen()

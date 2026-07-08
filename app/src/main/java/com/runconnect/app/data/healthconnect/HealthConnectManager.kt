@@ -4,17 +4,24 @@ import android.content.Context
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
+import androidx.health.connect.client.records.BodyFatRecord
 import androidx.health.connect.client.records.DistanceRecord
 import androidx.health.connect.client.records.ElevationGainedRecord
 import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.HeartRateRecord
+import androidx.health.connect.client.records.HeartRateVariabilityRmssdRecord
 import androidx.health.connect.client.records.PowerRecord
+import androidx.health.connect.client.records.RestingHeartRateRecord
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.SpeedRecord
+import androidx.health.connect.client.records.StepsRecord
+import androidx.health.connect.client.records.WeightRecord
 import androidx.health.connect.client.request.ReadRecordsRequest
+import androidx.health.connect.client.response.ExerciseRouteResult
 import androidx.health.connect.client.time.TimeRangeFilter
 import com.runconnect.app.domain.model.Activity
 import com.runconnect.app.domain.model.ActivityType
+import com.runconnect.app.domain.model.BodyMetricsSample
 import com.runconnect.app.domain.model.DataSource
 import com.runconnect.app.domain.model.HeartRateSample
 import com.runconnect.app.domain.model.LapData
@@ -45,6 +52,7 @@ class HealthConnectManager @Inject constructor(
 
     val requiredPermissions = setOf(
         HealthPermission.getReadPermission(ExerciseSessionRecord::class),
+        "android.permission.health.READ_EXERCISE_ROUTE",
         HealthPermission.getReadPermission(HeartRateRecord::class),
         HealthPermission.getReadPermission(SleepSessionRecord::class),
         HealthPermission.getReadPermission(SpeedRecord::class),
@@ -52,6 +60,11 @@ class HealthConnectManager @Inject constructor(
         HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class),
         HealthPermission.getReadPermission(ElevationGainedRecord::class),
         HealthPermission.getReadPermission(PowerRecord::class),
+        HealthPermission.getReadPermission(StepsRecord::class),
+        HealthPermission.getReadPermission(RestingHeartRateRecord::class),
+        HealthPermission.getReadPermission(HeartRateVariabilityRmssdRecord::class),
+        HealthPermission.getReadPermission(WeightRecord::class),
+        HealthPermission.getReadPermission(BodyFatRecord::class),
     )
 
     suspend fun checkPermissions(): Set<String> {
@@ -83,9 +96,7 @@ class HealthConnectManager @Inject constructor(
             val distance = readTotalDistance(c, session.startTime, session.endTime)
             val calories = readCalories(c, session.startTime, session.endTime)
             val elevation = readElevationGain(c, session.startTime, session.endTime)
-            // HC 1.1.0 removed direct route access from ExerciseSessionRecord;
-            // use client.readExerciseRoute(id) returning ExerciseRouteResult in a follow-up.
-            val route = emptyList<RoutePoint>()
+            // Route is loaded on demand in readExerciseRoute() to avoid per-activity network overhead
             val laps = session.segments.mapIndexed { idx, seg ->
                 LapData(
                     lapNumber = idx + 1,
@@ -118,7 +129,7 @@ class HealthConnectManager @Inject constructor(
                 averageSpeedMps = avgSpeed,
                 calories = calories?.toInt(),
                 laps = laps,
-                route = route,
+                route = emptyList(),
                 heartRateSamples = heartRateSamples,
                 speedSamples = speedSamples,
                 source = DataSource.HEALTH_CONNECT,
@@ -128,6 +139,23 @@ class HealthConnectManager @Inject constructor(
 
     suspend fun readActivityById(id: String): Activity? =
         readActivities().firstOrNull { it.id == id }
+
+    suspend fun readExerciseRoute(sessionId: String): List<RoutePoint> {
+        val c = client ?: return emptyList()
+        return when (val result = c.readExerciseRoute(sessionId)) {
+            is ExerciseRouteResult.Data -> result.exerciseRoute.route.map { loc ->
+                RoutePoint(
+                    latitude = loc.latitude,
+                    longitude = loc.longitude,
+                    altitudeMeters = loc.altitude?.inMeters,
+                    timestamp = loc.time,
+                )
+            }
+            is ExerciseRouteResult.ConsentRequired -> emptyList()
+            is ExerciseRouteResult.NoData -> emptyList()
+            else -> emptyList()
+        }
+    }
 
     suspend fun readSleepSessions(
         startTime: Instant = Instant.now().minus(30, ChronoUnit.DAYS),
@@ -158,6 +186,78 @@ class HealthConnectManager @Inject constructor(
                 source = DataSource.HEALTH_CONNECT,
             )
         }
+    }
+
+    suspend fun readRestingHeartRateHistory(
+        days: Int = 30,
+    ): List<Pair<Instant, Int>> {
+        val c = client ?: return emptyList()
+        val start = Instant.now().minus(days.toLong(), ChronoUnit.DAYS)
+        return c.readRecords(
+            ReadRecordsRequest(
+                recordType = RestingHeartRateRecord::class,
+                timeRangeFilter = TimeRangeFilter.between(start, Instant.now()),
+                ascendingOrder = false,
+            )
+        ).records.map { it.time to it.beatsPerMinute.toInt() }
+    }
+
+    suspend fun readHrvHistory(
+        days: Int = 30,
+    ): List<Pair<Instant, Double>> {
+        val c = client ?: return emptyList()
+        val start = Instant.now().minus(days.toLong(), ChronoUnit.DAYS)
+        return c.readRecords(
+            ReadRecordsRequest(
+                recordType = HeartRateVariabilityRmssdRecord::class,
+                timeRangeFilter = TimeRangeFilter.between(start, Instant.now()),
+                ascendingOrder = false,
+            )
+        ).records.map { it.time to it.heartRateVariabilityMillis }
+    }
+
+    suspend fun readStepsForRange(start: Instant, end: Instant): Long {
+        val c = client ?: return 0L
+        return c.readRecords(
+            ReadRecordsRequest(
+                recordType = StepsRecord::class,
+                timeRangeFilter = TimeRangeFilter.between(start, end),
+            )
+        ).records.sumOf { it.count }
+    }
+
+    suspend fun readActiveCaloriesForRange(start: Instant, end: Instant): Double {
+        val c = client ?: return 0.0
+        return c.readRecords(
+            ReadRecordsRequest(
+                recordType = ActiveCaloriesBurnedRecord::class,
+                timeRangeFilter = TimeRangeFilter.between(start, end),
+            )
+        ).records.sumOf { it.energy.inKilocalories }
+    }
+
+    suspend fun readWeightHistory(days: Int = 90): List<BodyMetricsSample> {
+        val c = client ?: return emptyList()
+        val start = Instant.now().minus(days.toLong(), ChronoUnit.DAYS)
+        return c.readRecords(
+            ReadRecordsRequest(
+                recordType = WeightRecord::class,
+                timeRangeFilter = TimeRangeFilter.between(start, Instant.now()),
+                ascendingOrder = false,
+            )
+        ).records.map { BodyMetricsSample(timestamp = it.time, weightKg = it.weight.inKilograms, bodyFatPercent = null) }
+    }
+
+    suspend fun readBodyFatHistory(days: Int = 90): List<BodyMetricsSample> {
+        val c = client ?: return emptyList()
+        val start = Instant.now().minus(days.toLong(), ChronoUnit.DAYS)
+        return c.readRecords(
+            ReadRecordsRequest(
+                recordType = BodyFatRecord::class,
+                timeRangeFilter = TimeRangeFilter.between(start, Instant.now()),
+                ascendingOrder = false,
+            )
+        ).records.map { BodyMetricsSample(timestamp = it.time, weightKg = null, bodyFatPercent = it.percentage.value) }
     }
 
     private suspend fun readHeartRateSamples(

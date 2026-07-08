@@ -13,37 +13,45 @@ Download the latest APK from the [Releases](https://github.com/beastzone/RunConn
 ## Features
 
 ### Home Dashboard
+- **Health Score** — composite score (0–100) broken down into Sleep, Activity, and Recovery rings
+- **Today's metrics** — steps, active calories, last night's sleep, resting HR, HRV (when available from Withings/Garmin)
+- **AI-style insights** — rule-based coaching cards: training load warnings (10% rule), sleep duration/quality, recovery alerts (elevated resting HR, low HRV), consistency streaks
 - Weekly summary: distance, activity count, time, day streak
 - 5 most recent activities with type, distance, duration, pace, heart rate
-- Pulls from Health Connect — works with any app that syncs there (Garmin Connect, Withings, etc.)
 
 ### Activities
 - Full list of runs, hikes, walks, cycles from the past 90 days
 - Per-activity detail screen with:
-  - **3D Mapbox map** with terrain elevation (requires Mapbox public token in Settings)
+  - **3D Mapbox map** with GPS route and terrain elevation (route loaded on-demand from Health Connect)
   - Elevation profile chart
   - Pace chart
   - Heart rate chart
   - Lap splits table
-  - **Race predictions** via the Riegel formula (`T2 = T1 × (D2/D1)^1.06`) for 1 mi, 5K, 10K, half marathon, and full marathon, benchmarked against your personal bests
+  - **Race predictions** via the Riegel formula (`T2 = T1 × (D2/D1)^1.06`) for 1 mi, 5K, 10K, half marathon, and full marathon
 
 ### Sleep Analytics
 - Sleep sessions from the last 30 days pulled from Health Connect
 - Per-night breakdown: Deep / Light / REM / Awake time
 - Color-coded stage timeline bar
-- Averages across all recorded nights
+- 30-day averages: total sleep, deep sleep, REM, sleep efficiency
 
 ### Heart Rate
 - HR zone distribution (Zone 1–5 based on % of max HR)
-- Trends and resting heart rate over time
-- Max HR configurable in Settings (default 190 bpm)
+- **Resting HR trend chart** — uses dedicated `RestingHeartRateRecord` from Garmin/Withings (not estimated from activity samples)
+- Max HR configurable in Settings
+
+### Body Metrics _(new)_
+- Weight trend chart (90 days from Withings via Health Connect)
+- Body fat % trend chart
+- 90-day change indicators
+- Measurement history table
 
 ### Settings
-- **Health Connect** — tap "Grant Permissions" to open the health permissions dialog (uses standard OS dialog on Android 14+, HC app dialog on Android 13-); shows SDK status and granted/required count. "Open Health Connect App" button as a manual fallback
+- **Health Connect** — tap "Grant Permissions" (uses OS permission dialog on Android 14+, HC app dialog on Android 13-); shows SDK status and granted/required count; "Open Health Connect App" fallback button
 - **Units** — toggle miles/km, lbs/kg
 - **Max heart rate** — used to compute HR zone boundaries
-- **Garmin Connect API** (optional) — enter Consumer Key + Secret from developer.garmin.com for deeper Garmin data; most data works without this via Health Connect
-- **Mapbox token** — already baked into the APK from the GitHub build; no need to enter it manually
+- **Garmin Connect API** (optional) — Consumer Key + Secret for deeper Garmin data
+- **Mapbox token** — already baked into the APK from the GitHub build secret; no manual entry needed
 
 ---
 
@@ -54,7 +62,7 @@ Download the latest APK from the [Releases](https://github.com/beastzone/RunConn
 3. Tap **"Grant Permissions"** under Health Connect and approve all data types
 4. In the **Garmin Connect** app: Settings → Health Connect → enable sync, do a manual sync
 5. In the **Withings** app: Health Connect sync should be on by default
-6. Return to the Home tab — activities load automatically
+6. Return to the Home tab — activities, health score, and insights load automatically
 
 ---
 
@@ -63,12 +71,17 @@ Download the latest APK from the [Releases](https://github.com/beastzone/RunConn
 | Data Type | Source |
 |---|---|
 | Exercise sessions (runs, hikes, etc.) | Health Connect ← Garmin Connect / Withings |
+| GPS route points | Health Connect `readExerciseRoute()` |
 | Heart rate samples | Health Connect |
+| Resting heart rate | Health Connect `RestingHeartRateRecord` |
+| HRV (RMSSD) | Health Connect `HeartRateVariabilityRmssdRecord` |
 | Sleep sessions + stages | Health Connect ← Garmin Connect / Withings |
+| Steps | Health Connect `StepsRecord` |
 | Speed / pace | Health Connect |
 | Distance | Health Connect |
 | Elevation gain | Health Connect |
-| GPS route | Health Connect (route stubbed — follow-up) |
+| Weight | Health Connect `WeightRecord` ← Withings |
+| Body fat % | Health Connect `BodyFatRecord` ← Withings |
 
 ---
 
@@ -82,10 +95,11 @@ Download the latest APK from the [Releases](https://github.com/beastzone/RunConn
 | DI | Hilt |
 | Health data | Health Connect SDK 1.1.0-rc01 |
 | Maps | Mapbox Maps SDK v11 (3D terrain) |
-| Charts | Custom Canvas (elevation, pace, HR) |
+| Charts | Custom Canvas (elevation, pace, HR, resting HR trend, weight trend) |
 | Networking | Retrofit + OkHttp + Moshi |
 | Storage | DataStore Preferences |
 | Race predictions | Riegel formula |
+| Insights | Rule-based engine (sleep, training load, recovery, consistency) |
 | Build | GitHub Actions (Gradle 8.12, AGP 8.9.1, compileSdk 36) |
 
 ---
@@ -105,11 +119,22 @@ No local Android Studio required. Every push to `main` triggers a GitHub Actions
 
 ---
 
-## Planned / In Progress
+## Permissions Requested (Health Connect)
 
-- [ ] GPS route display on 3D map (stubbed — Health Connect 1.1.0 `readExerciseRoute()` API)
-- [x] Health Connect permission grant — manifest now has both required privacy-policy declarations: `ACTION_SHOW_PERMISSIONS_RATIONALE` (Android 13-) and `VIEW_PERMISSION_USAGE` / `HEALTH_PERMISSIONS` activity-alias (Android 14+, the missing piece that caused HC to silently block the dialog); `DisposableEffect` lifecycle observer refreshes status on resume
-- [ ] Withings body composition (weight, body fat) via Health Connect
-- [ ] VO2 max trend chart
-- [ ] Training load / chronic load calculations
-- [ ] Widget for home screen
+| Permission | Used For |
+|---|---|
+| READ_EXERCISE | Activity sessions |
+| READ_EXERCISE_ROUTE | GPS route on activity detail map |
+| READ_HEART_RATE | HR charts and zone analysis |
+| READ_RESTING_HEART_RATE | Resting HR trend, recovery score |
+| READ_HEART_RATE_VARIABILITY_RMSSD | HRV trend, recovery insights |
+| READ_SLEEP | Sleep analytics |
+| READ_STEPS | Daily step count on dashboard |
+| READ_DISTANCE | Activity distance |
+| READ_SPEED | Pace charts |
+| READ_ELEVATION_GAINED | Elevation profile |
+| READ_ACTIVE_CALORIES_BURNED | Calorie tracking |
+| READ_POWER | Power data for cycling |
+| READ_VO2_MAX | VO2 max (display only) |
+| READ_WEIGHT | Body weight trend (Withings) |
+| READ_BODY_FAT | Body fat trend (Withings) |
