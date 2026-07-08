@@ -1,6 +1,7 @@
 package com.runconnect.app.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -95,6 +96,16 @@ fun ActivityCard(
                         color = TextSecondary,
                     )
                 }
+                if (activity.dataOriginPackage.isNotEmpty()) {
+                    Text(
+                        text = packageToDisplayName(activity.dataOriginPackage),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextSecondary,
+                        modifier = Modifier
+                            .border(0.5.dp, TextSecondary.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 5.dp, vertical = 2.dp),
+                    )
+                }
             }
 
             Spacer(Modifier.height(14.dp))
@@ -153,3 +164,15 @@ val ActivityType.icon: ImageVector
         ActivityType.CYCLING -> Icons.Filled.SportsScore
         ActivityType.OTHER -> Icons.Filled.SportsScore
     }
+
+fun packageToDisplayName(pkg: String): String = when {
+    pkg.contains("garmin") -> "Garmin Connect"
+    pkg.contains("withings") -> "Withings"
+    pkg.contains("google.android.apps.fitness") -> "Google Fit"
+    pkg.contains("samsung") && pkg.contains("health") -> "Samsung Health"
+    pkg.contains("polar") -> "Polar Flow"
+    pkg.contains("wahoo") -> "Wahoo"
+    pkg.contains("strava") -> "Strava"
+    pkg.isEmpty() -> ""
+    else -> pkg.substringAfterLast(".", pkg)
+}

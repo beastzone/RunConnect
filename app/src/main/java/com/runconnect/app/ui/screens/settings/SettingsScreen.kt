@@ -4,6 +4,8 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -22,6 +24,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -152,12 +159,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                     valueColor = if (state.healthConnectAvailable) TealPrimary else CoralAccent,
                 )
                 Spacer(Modifier.height(4.dp))
-                StatusRow(
-                    label = "Permissions",
-                    value = if (state.healthConnectPermissionsGranted) "All granted"
-                            else "${state.healthConnectGrantedCount}/${state.healthConnectRequiredCount} granted",
-                    valueColor = if (state.healthConnectPermissionsGranted) TealPrimary else CoralAccent,
-                )
+                PermissionsExpandableRow(state = state)
                 Spacer(Modifier.height(4.dp))
                 StatusRow(
                     label = "Last Synced",
@@ -187,6 +189,16 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                             Text("Sync Now")
                         }
                     }
+                }
+
+                state.lastSyncSummary?.let { summary ->
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        summary,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TealPrimary,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
 
                 if (!state.healthConnectPermissionsGranted) {
@@ -472,6 +484,69 @@ private fun StatusRow(label: String, value: String, valueColor: androidx.compose
     ) {
         Text(label, style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
         Text(value, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium), color = valueColor)
+    }
+}
+
+@Composable
+private fun PermissionsExpandableRow(state: SettingsUiState) {
+    var expanded by remember(state.healthConnectPermissionsGranted) {
+        mutableStateOf(!state.healthConnectPermissionsGranted)
+    }
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Permissions", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    if (state.healthConnectPermissionsGranted) "All granted"
+                    else "${state.healthConnectGrantedCount}/${state.healthConnectRequiredCount} granted",
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                    color = if (state.healthConnectPermissionsGranted) TealPrimary else CoralAccent,
+                )
+                Icon(
+                    imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                    contentDescription = if (expanded) "Collapse" else "Expand",
+                    tint = TextSecondary,
+                    modifier = Modifier.size(18.dp).clickable { expanded = !expanded },
+                )
+            }
+        }
+        AnimatedVisibility(visible = expanded) {
+            Column(modifier = Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                state.permissionStatuses.forEach { (info, granted) ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.Top,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Icon(
+                            imageVector = if (granted) Icons.Filled.CheckCircle else Icons.Filled.Cancel,
+                            contentDescription = null,
+                            tint = if (granted) TealPrimary else CoralAccent,
+                            modifier = Modifier.size(16.dp).padding(top = 1.dp),
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                info.displayName,
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                                color = if (granted) TextPrimary else CoralAccent,
+                            )
+                            Text(
+                                info.usedFor,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextSecondary,
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

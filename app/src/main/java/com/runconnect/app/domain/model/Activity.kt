@@ -21,6 +21,7 @@ data class Activity(
     val speedSamples: List<SpeedSample> = emptyList(),
     val source: DataSource = DataSource.HEALTH_CONNECT,
     val garminActivityId: Long? = null,
+    val dataOriginPackage: String = "",
 )
 
 enum class ActivityType(val label: String) {

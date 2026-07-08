@@ -40,6 +40,8 @@ import javax.inject.Singleton
 
 data class ChangeSummary(val hasExerciseChanges: Boolean, val newToken: String)
 
+data class PermissionInfo(val permission: String, val displayName: String, val usedFor: String)
+
 data class RouteResult(
     val points: List<RoutePoint> = emptyList(),
     val consentRequired: Boolean = false,
@@ -59,22 +61,24 @@ class HealthConnectManager @Inject constructor(
     val isAvailable: Boolean
         get() = sdkStatus == HealthConnectClient.SDK_AVAILABLE
 
-    val requiredPermissions = setOf(
-        HealthPermission.getReadPermission(ExerciseSessionRecord::class),
-        "android.permission.health.READ_EXERCISE_ROUTE",
-        HealthPermission.getReadPermission(HeartRateRecord::class),
-        HealthPermission.getReadPermission(SleepSessionRecord::class),
-        HealthPermission.getReadPermission(SpeedRecord::class),
-        HealthPermission.getReadPermission(DistanceRecord::class),
-        HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class),
-        HealthPermission.getReadPermission(ElevationGainedRecord::class),
-        HealthPermission.getReadPermission(PowerRecord::class),
-        HealthPermission.getReadPermission(StepsRecord::class),
-        HealthPermission.getReadPermission(RestingHeartRateRecord::class),
-        HealthPermission.getReadPermission(HeartRateVariabilityRmssdRecord::class),
-        HealthPermission.getReadPermission(WeightRecord::class),
-        HealthPermission.getReadPermission(BodyFatRecord::class),
+    val permissionInfoList = listOf(
+        PermissionInfo(HealthPermission.getReadPermission(ExerciseSessionRecord::class), "Exercise Sessions", "Activity list: runs, hikes, walks, cycles"),
+        PermissionInfo("android.permission.health.READ_EXERCISE_ROUTE", "GPS Routes", "3D route map on activity detail"),
+        PermissionInfo(HealthPermission.getReadPermission(HeartRateRecord::class), "Heart Rate", "HR charts and zone analysis"),
+        PermissionInfo(HealthPermission.getReadPermission(SleepSessionRecord::class), "Sleep", "Sleep analytics and recovery score"),
+        PermissionInfo(HealthPermission.getReadPermission(SpeedRecord::class), "Speed / Pace", "Pace chart on activity detail"),
+        PermissionInfo(HealthPermission.getReadPermission(DistanceRecord::class), "Distance", "Activity distance and pace calculation"),
+        PermissionInfo(HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class), "Active Calories", "Calorie tracking on dashboard and activities"),
+        PermissionInfo(HealthPermission.getReadPermission(ElevationGainedRecord::class), "Elevation", "Elevation profile chart"),
+        PermissionInfo(HealthPermission.getReadPermission(PowerRecord::class), "Power", "Cycling power data"),
+        PermissionInfo(HealthPermission.getReadPermission(StepsRecord::class), "Steps", "Daily step count on dashboard"),
+        PermissionInfo(HealthPermission.getReadPermission(RestingHeartRateRecord::class), "Resting Heart Rate", "Resting HR trend and recovery score"),
+        PermissionInfo(HealthPermission.getReadPermission(HeartRateVariabilityRmssdRecord::class), "HRV", "HRV trend and recovery insights"),
+        PermissionInfo(HealthPermission.getReadPermission(WeightRecord::class), "Weight", "Body weight trend from Withings"),
+        PermissionInfo(HealthPermission.getReadPermission(BodyFatRecord::class), "Body Fat", "Body fat % trend from Withings"),
     )
+
+    val requiredPermissions = permissionInfoList.map { it.permission }.toSet()
 
     suspend fun checkPermissions(): Set<String> {
         val c = client ?: return emptySet()
@@ -201,6 +205,7 @@ class HealthConnectManager @Inject constructor(
                 heartRateSamples = heartRateSamples,
                 speedSamples = speedSamples,
                 source = DataSource.HEALTH_CONNECT,
+                dataOriginPackage = session.metadata.dataOrigin.packageName,
             )
         }
     }

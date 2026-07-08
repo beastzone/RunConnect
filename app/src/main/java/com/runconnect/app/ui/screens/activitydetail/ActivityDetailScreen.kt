@@ -51,6 +51,7 @@ import com.runconnect.app.ui.components.SectionHeader
 import com.runconnect.app.ui.components.SmallStatItem
 import com.runconnect.app.ui.components.accentColor
 import com.runconnect.app.ui.components.icon
+import com.runconnect.app.ui.components.packageToDisplayName
 import com.runconnect.app.ui.theme.Background
 import com.runconnect.app.ui.theme.CardDark
 import com.runconnect.app.ui.theme.CoralAccent
@@ -148,9 +149,11 @@ private fun ActivityDetailContent(
                             style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                             color = TextPrimary,
                         )
+                        val sourceLabel = packageToDisplayName(activity.dataOriginPackage)
                         Text(
                             FormatUtils.formatFullDate(activity.startTime) + " · " +
-                                    FormatUtils.formatTime(activity.startTime),
+                                    FormatUtils.formatTime(activity.startTime) +
+                                    if (sourceLabel.isNotEmpty()) " · $sourceLabel" else "",
                             style = MaterialTheme.typography.bodySmall,
                             color = TextSecondary,
                         )

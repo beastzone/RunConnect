@@ -4,6 +4,7 @@ import androidx.health.connect.client.HealthConnectClient
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.runconnect.app.data.healthconnect.HealthConnectManager
+import com.runconnect.app.data.healthconnect.PermissionInfo
 import com.runconnect.app.data.preferences.AppPreferences
 import com.runconnect.app.data.remote.garmin.GarminAuthManager
 import com.runconnect.app.data.repository.ActivityRepository
@@ -36,6 +37,8 @@ data class SettingsUiState(
     val hcChangesTokenPresent: Boolean = false,
     val cacheActivityCount: Int = 0,
     val lastBackgroundSyncLabel: String = "Never",
+    val permissionStatuses: List<Pair<PermissionInfo, Boolean>> = emptyList(),
+    val lastSyncSummary: String? = null,
 ) {
     val healthConnectStatusLabel: String get() = when (healthConnectSdkStatus) {
         HealthConnectClient.SDK_AVAILABLE -> "Available (SDK ${healthConnectSdkStatus})"
@@ -128,17 +131,29 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun syncNow() = viewModelScope.launch {
-        _uiState.value = _uiState.value.copy(isSyncing = true)
+        _uiState.value = _uiState.value.copy(isSyncing = true, lastSyncSummary = null)
         val daysBack = appPreferences.dataDaysBack.first()
+        val prevIds = activityRepository.getCachedIds()
         activityRepository.invalidateCache()
         runCatching {
             activityRepository.getActivities(daysBack = daysBack, forceRefresh = true).first()
+        }
+        val newIds = activityRepository.getCachedIds()
+        val added = (newIds - prevIds).size
+        val removed = (prevIds - newIds).size
+        val total = newIds.size
+        val summary = when {
+            added > 0 && removed > 0 -> "$added new, $removed removed"
+            added > 0 -> "$added new ${if (added == 1) "activity" else "activities"}"
+            removed > 0 -> "$removed ${if (removed == 1) "activity" else "activities"} removed"
+            else -> "Up to date · $total ${if (total == 1) "activity" else "activities"}"
         }
         val syncEpoch = appPreferences.lastSyncTime.first()
         _uiState.value = _uiState.value.copy(
             isSyncing = false,
             lastSyncLabel = formatLastSync(syncEpoch),
             cacheActivityCount = activityRepository.cacheSize,
+            lastSyncSummary = summary,
         )
     }
 
@@ -159,6 +174,7 @@ class SettingsViewModel @Inject constructor(
     private suspend fun refreshPermissionsInternal() {
         val granted = runCatching { healthConnectManager.checkPermissions() }.getOrDefault(emptySet())
         val required = healthConnectManager.requiredPermissions
+        val permStatuses = healthConnectManager.permissionInfoList.map { it to (it.permission in granted) }
         _uiState.value = _uiState.value.copy(
             healthConnectSdkStatus = healthConnectManager.sdkStatus,
             healthConnectAvailable = healthConnectManager.isAvailable,
@@ -166,6 +182,7 @@ class SettingsViewModel @Inject constructor(
             healthConnectGrantedCount = granted.count { it in required },
             healthConnectRequiredCount = required.size,
             cacheActivityCount = activityRepository.cacheSize,
+            permissionStatuses = permStatuses,
         )
     }
 

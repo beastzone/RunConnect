@@ -21,6 +21,7 @@ class ActivityRepository @Inject constructor(
     private var cacheTime: Instant? = null
 
     val cacheSize: Int get() = cache.size
+    fun getCachedIds(): Set<String> = cache.map { it.id }.toSet()
 
     fun getActivities(
         daysBack: Int = 90,
