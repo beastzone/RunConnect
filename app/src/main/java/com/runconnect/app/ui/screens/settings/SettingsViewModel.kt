@@ -80,4 +80,13 @@ class SettingsViewModel @Inject constructor(
     fun disconnectGarmin() = viewModelScope.launch {
         garminAuthManager.signOut()
     }
+
+    val requiredPermissions: Set<String>
+        get() = healthConnectManager.requiredPermissions
+
+    fun refreshPermissions() = viewModelScope.launch {
+        _uiState.value = _uiState.value.copy(
+            healthConnectPermissionsGranted = healthConnectManager.hasAllPermissions()
+        )
+    }
 }

@@ -39,8 +39,18 @@ class ActivityRepository @Inject constructor(
             cacheTime = now
             emit(Result.success(activities))
         }.onFailure { e ->
-            if (cache.isNotEmpty()) emit(Result.success(cache.toList()))
-            else emit(Result.failure(e))
+            if (cache.isNotEmpty()) {
+                emit(Result.success(cache.toList()))
+            } else {
+                val isPermissionError = e is SecurityException ||
+                    e.cause is SecurityException ||
+                    e.message?.contains("SecurityException") == true ||
+                    e.message?.contains("permission", ignoreCase = true) == true
+                val reported = if (isPermissionError)
+                    Exception("Health Connect permissions not granted. Go to Settings → Health Connect → Grant Permissions.")
+                else e
+                emit(Result.failure(reported))
+            }
         }
     }
 

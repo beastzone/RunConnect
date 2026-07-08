@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -31,6 +32,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.health.connect.client.HealthConnectClient
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,6 +52,13 @@ import com.runconnect.app.ui.theme.TextSecondary
 @Composable
 fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsState()
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        HealthConnectClient.requestPermissionActivityContract()
+    ) {
+        viewModel.refreshPermissions()
+    }
+
     var garminKey by remember { mutableStateOf("") }
     var garminSecret by remember { mutableStateOf("") }
     var mapboxToken by remember { mutableStateOf(state.mapboxToken) }
@@ -117,10 +126,19 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                     value = if (state.healthConnectPermissionsGranted) "Granted" else "Not granted",
                     valueColor = if (state.healthConnectPermissionsGranted) TealPrimary else CoralAccent,
                 )
-                if (!state.healthConnectPermissionsGranted) {
+                if (!state.healthConnectPermissionsGranted && state.healthConnectAvailable) {
+                    Spacer(Modifier.height(12.dp))
+                    Button(
+                        onClick = { permissionLauncher.launch(viewModel.requiredPermissions) },
+                        colors = ButtonDefaults.buttonColors(containerColor = TealPrimary),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Grant Permissions", color = MaterialTheme.colorScheme.background)
+                    }
+                } else if (!state.healthConnectAvailable) {
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "Open Health Connect and grant RunConnect permissions for Exercise, Heart Rate, Sleep, Speed, Distance, and Elevation data.",
+                        "Health Connect is not installed. Install it from the Play Store to use this app.",
                         style = MaterialTheme.typography.bodySmall,
                         color = TextSecondary,
                     )
