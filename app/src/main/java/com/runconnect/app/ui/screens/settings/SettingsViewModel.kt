@@ -8,6 +8,7 @@ import com.runconnect.app.data.healthconnect.PermissionInfo
 import com.runconnect.app.data.preferences.AppPreferences
 import com.runconnect.app.data.remote.garmin.GarminAuthManager
 import com.runconnect.app.data.repository.ActivityRepository
+import com.runconnect.app.data.repository.ImportProgress
 import com.runconnect.app.data.sync.SyncScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,6 +40,8 @@ data class SettingsUiState(
     val lastBackgroundSyncLabel: String = "Never",
     val permissionStatuses: List<Pair<PermissionInfo, Boolean>> = emptyList(),
     val lastSyncSummary: String? = null,
+    val importProgress: ImportProgress = ImportProgress(),
+    val historyImportedLabel: String? = null,
 ) {
     val healthConnectStatusLabel: String get() = when (healthConnectSdkStatus) {
         HealthConnectClient.SDK_AVAILABLE -> "Available (SDK ${healthConnectSdkStatus})"
@@ -103,6 +106,22 @@ class SettingsViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(lastBackgroundSyncLabel = formatLastSync(epochSeconds))
             }
         }
+        viewModelScope.launch {
+            activityRepository.importProgress.collect { progress ->
+                _uiState.value = _uiState.value.copy(importProgress = progress)
+            }
+        }
+        viewModelScope.launch {
+            appPreferences.historyImportedThrough.collect { epoch ->
+                _uiState.value = _uiState.value.copy(
+                    historyImportedLabel = epoch?.let {
+                        val date = Instant.ofEpochSecond(it).atZone(ZoneId.systemDefault())
+                        val mon = date.month.name.lowercase().replaceFirstChar { c -> c.uppercase() }.take(3)
+                        "Imported from $mon ${date.year}"
+                    }
+                )
+            }
+        }
         viewModelScope.launch { refreshPermissionsInternal() }
     }
 
@@ -155,6 +174,11 @@ class SettingsViewModel @Inject constructor(
             cacheActivityCount = activityRepository.cacheSize,
             lastSyncSummary = summary,
         )
+    }
+
+    fun importHistory(yearsBack: Int = 5) = viewModelScope.launch {
+        activityRepository.importHistory(yearsBack)
+        _uiState.value = _uiState.value.copy(cacheActivityCount = activityRepository.cacheSize)
     }
 
     fun setBackgroundSyncEnabled(enabled: Boolean) = viewModelScope.launch {

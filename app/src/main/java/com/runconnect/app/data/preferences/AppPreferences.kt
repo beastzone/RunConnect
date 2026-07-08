@@ -25,6 +25,7 @@ class AppPreferences @Inject constructor(
         private val KEY_HC_CHANGES_TOKEN = stringPreferencesKey("hc_changes_token")
         private val KEY_BACKGROUND_SYNC_ENABLED = booleanPreferencesKey("background_sync_enabled")
         private val KEY_LAST_BG_SYNC_TIME = longPreferencesKey("last_background_sync_time")
+        private val KEY_HISTORY_IMPORTED_THROUGH = longPreferencesKey("history_imported_through")
     }
 
     val useImperial: Flow<Boolean> = dataStore.data.map { it[KEY_USE_IMPERIAL] ?: false }
@@ -35,6 +36,7 @@ class AppPreferences @Inject constructor(
     val hcChangesToken: Flow<String?> = dataStore.data.map { it[KEY_HC_CHANGES_TOKEN] }
     val backgroundSyncEnabled: Flow<Boolean> = dataStore.data.map { it[KEY_BACKGROUND_SYNC_ENABLED] ?: false }
     val lastBackgroundSyncTime: Flow<Long?> = dataStore.data.map { it[KEY_LAST_BG_SYNC_TIME] }
+    val historyImportedThrough: Flow<Long?> = dataStore.data.map { it[KEY_HISTORY_IMPORTED_THROUGH] }
 
     suspend fun setUseImperial(value: Boolean) { dataStore.edit { it[KEY_USE_IMPERIAL] = value } }
     suspend fun setMapboxToken(token: String) { dataStore.edit { it[KEY_MAPBOX_TOKEN] = token } }
@@ -46,4 +48,5 @@ class AppPreferences @Inject constructor(
     }
     suspend fun setBackgroundSyncEnabled(enabled: Boolean) { dataStore.edit { it[KEY_BACKGROUND_SYNC_ENABLED] = enabled } }
     suspend fun setLastBackgroundSyncTime(epochSeconds: Long) { dataStore.edit { it[KEY_LAST_BG_SYNC_TIME] = epochSeconds } }
+    suspend fun setHistoryImportedThrough(epochSeconds: Long) { dataStore.edit { it[KEY_HISTORY_IMPORTED_THROUGH] = epochSeconds } }
 }

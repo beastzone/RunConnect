@@ -6,6 +6,7 @@ import com.runconnect.app.data.preferences.AppPreferences
 import com.runconnect.app.data.repository.ActivityRepository
 import com.runconnect.app.domain.model.Activity
 import com.runconnect.app.domain.model.ActivityType
+import com.runconnect.app.ui.components.packageToDisplayName
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,6 +21,8 @@ data class ActivitiesUiState(
     val activities: List<Activity> = emptyList(),
     val filteredActivities: List<Activity> = emptyList(),
     val selectedFilter: ActivityType? = null,
+    val sourceFilter: String? = null,
+    val availableSources: List<Pair<String, String>> = emptyList(),
     val useImperial: Boolean = false,
 )
 
@@ -39,11 +42,21 @@ class ActivitiesViewModel @Inject constructor(
     fun refresh() = loadActivities(forceRefresh = true)
 
     fun setFilter(type: ActivityType?) {
-        val all = _uiState.value.activities
-        _uiState.value = _uiState.value.copy(
-            selectedFilter = type,
-            filteredActivities = if (type == null) all else all.filter { it.type == type },
-        )
+        _uiState.value = _uiState.value.copy(selectedFilter = type)
+        applyFilters()
+    }
+
+    fun setSourceFilter(packageName: String?) {
+        _uiState.value = _uiState.value.copy(sourceFilter = packageName)
+        applyFilters()
+    }
+
+    private fun applyFilters() {
+        val state = _uiState.value
+        val filtered = state.activities
+            .let { if (state.selectedFilter != null) it.filter { a -> a.type == state.selectedFilter } else it }
+            .let { if (state.sourceFilter != null) it.filter { a -> a.dataOriginPackage == state.sourceFilter } else it }
+        _uiState.value = state.copy(filteredActivities = filtered)
     }
 
     private fun loadActivities(forceRefresh: Boolean = false) {
@@ -54,13 +67,17 @@ class ActivitiesViewModel @Inject constructor(
             activityRepository.getActivities(daysBack = 365, forceRefresh = forceRefresh)
                 .collectLatest { result ->
                     result.onSuccess { activities ->
-                        val filter = _uiState.value.selectedFilter
+                        val sources = activities
+                            .map { it.dataOriginPackage }
+                            .filter { it.isNotEmpty() }
+                            .distinct()
+                            .map { it to packageToDisplayName(it) }
                         _uiState.value = _uiState.value.copy(
                             isLoading = false,
                             activities = activities,
-                            filteredActivities = if (filter == null) activities
-                            else activities.filter { it.type == filter },
+                            availableSources = sources,
                         )
+                        applyFilters()
                     }.onFailure { e ->
                         _uiState.value = _uiState.value.copy(
                             isLoading = false,

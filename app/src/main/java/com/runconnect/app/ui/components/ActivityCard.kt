@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -38,12 +39,15 @@ import com.runconnect.app.domain.model.averagePaceSecondsPerKm
 import com.runconnect.app.domain.model.averagePaceSecondsPerMile
 import com.runconnect.app.domain.model.distanceKm
 import com.runconnect.app.domain.model.distanceMiles
+import com.runconnect.app.ui.theme.AmberAccent
 import com.runconnect.app.ui.theme.CardDark
+import com.runconnect.app.ui.theme.CoralAccent
 import com.runconnect.app.ui.theme.CycleColor
 import com.runconnect.app.ui.theme.DividerColor
 import com.runconnect.app.ui.theme.HeartRate
 import com.runconnect.app.ui.theme.HikeColor
 import com.runconnect.app.ui.theme.RunColor
+import com.runconnect.app.ui.theme.TealPrimary
 import com.runconnect.app.ui.theme.TextPrimary
 import com.runconnect.app.ui.theme.TextSecondary
 import com.runconnect.app.ui.theme.WalkColor
@@ -96,6 +100,14 @@ fun ActivityCard(
                         color = TextSecondary,
                     )
                 }
+                if (activity.hasDuplicate) {
+                    Text(
+                        text = "⚠ Dup",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = AmberAccent,
+                        modifier = Modifier.padding(end = 6.dp),
+                    )
+                }
                 if (activity.dataOriginPackage.isNotEmpty()) {
                     Text(
                         text = packageToDisplayName(activity.dataOriginPackage),
@@ -140,6 +152,29 @@ fun ActivityCard(
                         label = "Avg HR",
                         value = "$hr",
                         valueColor = HeartRate,
+                    )
+                }
+            }
+
+            if (activity.completenessScore > 0) {
+                Spacer(Modifier.height(10.dp))
+                val completenessColor = when {
+                    activity.completenessScore >= 80 -> TealPrimary
+                    activity.completenessScore >= 50 -> AmberAccent
+                    else -> CoralAccent
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(3.dp)
+                        .clip(RoundedCornerShape(1.5.dp))
+                        .background(TextSecondary.copy(alpha = 0.1f))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(activity.completenessScore / 100f)
+                            .fillMaxHeight()
+                            .background(completenessColor)
                     )
                 }
             }

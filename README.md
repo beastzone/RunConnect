@@ -23,6 +23,9 @@ Download the latest APK from the [Releases](https://github.com/beastzone/RunConn
 ### Activities
 - Full list of runs, hikes, walks, cycles from the past 90 days
 - **Data source badge** — each activity card shows its source app (Garmin Connect, Withings, Google Fit, Samsung Health, etc.) from HC metadata
+- **Source filter chips** — when activities come from multiple apps, a second row of chips lets you filter by source
+- **Duplicate detection** — activities recorded simultaneously by different apps are flagged with a ⚠ Dup badge; overlap > 50% of the shorter session's duration triggers the flag
+- **Data completeness bar** — thin 3-color bar at the bottom of each card (teal ≥ 80%, amber ≥ 50%, coral < 50%) based on presence of HR, distance, calories, elevation, and laps (max 100 pts)
 - Per-activity detail screen with:
   - **3D Mapbox map** with GPS route and terrain elevation (route loaded on-demand from Health Connect)
   - **Elevation profile chart** — with X/Y axis labels and touch scrubbing (altitude + distance tooltip)
@@ -53,6 +56,7 @@ Download the latest APK from the [Releases](https://github.com/beastzone/RunConn
 - **Health Connect** — tap "Grant Permissions" (uses OS permission dialog on Android 14+, HC app dialog on Android 13-); **per-permission breakdown** (14 permissions, collapsible list with display name + purpose + granted/denied indicator); **Sync Now** reports what changed ("3 new activities", "Up to date", etc.)
 - **Background Sync & Diagnostics** — toggle automatic HC polling every 15 min (WorkManager); shows incremental change token status, cached activity count, last manual and background sync times; uses HC change tokens to skip full 6-call fetch when nothing changed
 - **Data History** — choose how far back to load from HC: 1 Day / 1 Week / 1 Month / 3 Months / 6 Months / 1 Year (default 3 months); changing this automatically re-fetches with the new range
+- **Historical Import** — one-tap import of up to 5 years of workout history from Health Connect in 90-day chunks with live progress display (current period + activity count); last import date persisted in DataStore
 - **Units** — toggle miles/km, lbs/kg
 - **Max heart rate** — used to compute HR zone boundaries
 - **Garmin Connect API** (optional) — Consumer Key + Secret for deeper Garmin data

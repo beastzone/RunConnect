@@ -258,6 +258,11 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
             DataHistorySection(state = state, viewModel = viewModel)
         }
 
+        // --- Historical Import ---
+        item {
+            HistoricalImportSection(state = state, viewModel = viewModel)
+        }
+
         // --- Garmin Connect ---
         item {
             SettingsSection("Garmin Connect API (Optional)") {
@@ -404,6 +409,51 @@ private fun DataHistorySection(state: SettingsUiState, viewModel: SettingsViewMo
                         borderColor = BorderColor,
                     ),
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HistoricalImportSection(state: SettingsUiState, viewModel: SettingsViewModel) {
+    SettingsSection("Historical Import") {
+        Text(
+            "Import up to 5 years of workout history from Health Connect",
+            style = MaterialTheme.typography.bodySmall,
+            color = TextSecondary,
+        )
+        state.historyImportedLabel?.let { label ->
+            Spacer(Modifier.height(8.dp))
+            StatusRow(label = "Last Import", value = label, valueColor = TealPrimary)
+        }
+        Spacer(Modifier.height(12.dp))
+        if (state.importProgress.isRunning) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(18.dp), color = TealPrimary, strokeWidth = 2.dp)
+                Column {
+                    Text(
+                        "Importing… ${state.importProgress.currentPeriod}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextPrimary,
+                    )
+                    Text(
+                        "${state.importProgress.activitiesLoaded} activities loaded",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextSecondary,
+                    )
+                }
+            }
+        } else {
+            OutlinedButton(
+                onClick = { viewModel.importHistory() },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = TealPrimary),
+                border = androidx.compose.foundation.BorderStroke(1.dp, TealPrimary),
+            ) {
+                Text("Import 5 Years of History")
             }
         }
     }

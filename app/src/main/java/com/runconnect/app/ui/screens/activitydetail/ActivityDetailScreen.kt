@@ -208,7 +208,7 @@ private fun ActivityDetailContent(
                     if (activity.elevationGainMeters > 0) {
                         SmallStatItem(
                             label = "Elev Gain",
-                            value = FormatUtils.formatElevation(activity.elevationGainMeters),
+                            value = FormatUtils.formatElevation(activity.elevationGainMeters, state.useImperial),
                         )
                     }
                     activity.averageHeartRate?.let { hr ->

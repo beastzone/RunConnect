@@ -63,12 +63,12 @@ fun ActivitiesScreen(
             )
         }
 
-        // Filter chips
+        // Activity type filter chips
         Row(
             modifier = Modifier
                 .horizontalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp)
-                .padding(bottom = 12.dp),
+                .padding(bottom = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             FilterChip(
@@ -90,6 +90,40 @@ fun ActivitiesScreen(
                         selectedLabelColor = MaterialTheme.colorScheme.background,
                     ),
                 )
+            }
+        }
+
+        // Source filter chips (only when activities come from multiple apps)
+        if (state.availableSources.size > 1) {
+            Row(
+                modifier = Modifier
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp)
+                    .padding(bottom = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                FilterChip(
+                    selected = state.sourceFilter == null,
+                    onClick = { viewModel.setSourceFilter(null) },
+                    label = { Text("All Sources") },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = TealPrimary,
+                        selectedLabelColor = MaterialTheme.colorScheme.background,
+                        labelColor = TextSecondary,
+                    ),
+                )
+                state.availableSources.forEach { (pkg, displayName) ->
+                    FilterChip(
+                        selected = state.sourceFilter == pkg,
+                        onClick = { viewModel.setSourceFilter(pkg) },
+                        label = { Text(displayName) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = TealPrimary,
+                            selectedLabelColor = MaterialTheme.colorScheme.background,
+                            labelColor = TextSecondary,
+                        ),
+                    )
+                }
             }
         }
 

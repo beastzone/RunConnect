@@ -22,6 +22,8 @@ data class Activity(
     val source: DataSource = DataSource.HEALTH_CONNECT,
     val garminActivityId: Long? = null,
     val dataOriginPackage: String = "",
+    val completenessScore: Int = 0,
+    val hasDuplicate: Boolean = false,
 )
 
 enum class ActivityType(val label: String) {

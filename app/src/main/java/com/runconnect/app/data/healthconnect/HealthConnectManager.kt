@@ -34,6 +34,7 @@ import com.runconnect.app.domain.model.SleepStageType
 import com.runconnect.app.domain.model.SpeedSample
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.time.Instant
+import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -186,6 +187,15 @@ class HealthConnectManager @Inject constructor(
             val avgSpeed = if (distance > 0 && durationS > 0) distance / durationS else null
             val avgHr = heartRateSamples.map { it.bpm }.average().takeIf { !it.isNaN() }?.toInt()
             val maxHr = heartRateSamples.maxOfOrNull { it.bpm }?.toInt()
+            val completeness = run {
+                var s = 0
+                if (heartRateSamples.isNotEmpty()) s += 30
+                if (distance > 0) s += 25
+                if (calories != null) s += 15
+                if (elevation > 0) s += 15
+                if (laps.isNotEmpty()) s += 15
+                s
+            }
 
             Activity(
                 id = session.metadata.id,
@@ -206,8 +216,31 @@ class HealthConnectManager @Inject constructor(
                 speedSamples = speedSamples,
                 source = DataSource.HEALTH_CONNECT,
                 dataOriginPackage = session.metadata.dataOrigin.packageName,
+                completenessScore = completeness,
             )
         }
+    }
+
+    // Reads all history in 90-day chunks, calling onProgress after each chunk.
+    suspend fun readActivitiesChunked(
+        totalStart: Instant,
+        totalEnd: Instant = Instant.now(),
+        onProgress: (loaded: Int, label: String) -> Unit,
+    ): List<Activity> {
+        val all = mutableListOf<Activity>()
+        var chunkEnd = totalEnd
+        val chunkDays = 90L
+        while (chunkEnd.isAfter(totalStart)) {
+            val chunkStart = maxOf(chunkEnd.minus(chunkDays, ChronoUnit.DAYS), totalStart)
+            val chunk = readActivities(chunkStart, chunkEnd)
+            all.addAll(chunk)
+            val ldt = chunkStart.atZone(ZoneId.systemDefault())
+            val monthName = ldt.month.name.lowercase().replaceFirstChar { it.uppercase() }.take(3)
+            onProgress(all.size, "$monthName ${ldt.year}")
+            if (chunkStart == totalStart) break
+            chunkEnd = chunkStart
+        }
+        return all
     }
 
     suspend fun readActivityById(id: String): Activity? =

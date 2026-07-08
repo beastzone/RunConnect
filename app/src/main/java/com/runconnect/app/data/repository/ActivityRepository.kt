@@ -2,15 +2,23 @@ package com.runconnect.app.data.repository
 
 import com.runconnect.app.data.healthconnect.HealthConnectManager
 import com.runconnect.app.data.healthconnect.RouteResult
-import kotlinx.coroutines.flow.first
 import com.runconnect.app.data.preferences.AppPreferences
 import com.runconnect.app.domain.model.Activity
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import javax.inject.Inject
 import javax.inject.Singleton
+
+data class ImportProgress(
+    val isRunning: Boolean = false,
+    val activitiesLoaded: Int = 0,
+    val currentPeriod: String = "",
+)
 
 @Singleton
 class ActivityRepository @Inject constructor(
@@ -19,6 +27,9 @@ class ActivityRepository @Inject constructor(
 ) {
     private val cache = mutableListOf<Activity>()
     private var cacheTime: Instant? = null
+
+    private val _importProgress = MutableStateFlow(ImportProgress())
+    val importProgress: StateFlow<ImportProgress> = _importProgress
 
     val cacheSize: Int get() = cache.size
     fun getCachedIds(): Set<String> = cache.map { it.id }.toSet()
@@ -60,7 +71,7 @@ class ActivityRepository @Inject constructor(
             healthConnectManager.readActivities(startTime, now)
         }
         if (fetchResult.isSuccess) {
-            val activities = fetchResult.getOrThrow()
+            val activities = tagDuplicates(fetchResult.getOrThrow())
             cache.clear()
             cache.addAll(activities)
             cacheTime = now
@@ -116,5 +127,58 @@ class ActivityRepository @Inject constructor(
 
     fun invalidateCache() {
         cacheTime = null  // Mark stale — cache data survives as fallback if next fetch fails
+    }
+
+    suspend fun importHistory(yearsBack: Int = 5) {
+        val now = Instant.now()
+        val start = now.minus((yearsBack * 365).toLong(), ChronoUnit.DAYS)
+        _importProgress.value = ImportProgress(isRunning = true)
+        val result = runCatching {
+            healthConnectManager.readActivitiesChunked(
+                totalStart = start,
+                totalEnd = now,
+            ) { loaded, label ->
+                _importProgress.value = ImportProgress(isRunning = true, activitiesLoaded = loaded, currentPeriod = label)
+            }
+        }
+        if (result.isSuccess) {
+            val imported = tagDuplicates(result.getOrThrow())
+            val existingIds = cache.map { it.id }.toSet()
+            val newOnes = imported.filter { it.id !in existingIds }
+            cache.addAll(0, newOnes)
+            cacheTime = null
+            appPreferences.setHistoryImportedThrough(start.epochSecond)
+            appPreferences.setLastSyncTime(now.epochSecond)
+        }
+        _importProgress.value = ImportProgress(
+            isRunning = false,
+            activitiesLoaded = if (result.isSuccess) result.getOrThrow().size else 0,
+        )
+    }
+
+    // Tags activities that appear to be the same workout recorded by different apps.
+    private fun tagDuplicates(activities: List<Activity>): List<Activity> {
+        if (activities.size < 2) return activities
+        val dupeIds = mutableSetOf<String>()
+        for (i in activities.indices) {
+            for (j in i + 1 until activities.size) {
+                if (isLikelyDuplicate(activities[i], activities[j])) {
+                    dupeIds += activities[i].id
+                    dupeIds += activities[j].id
+                }
+            }
+        }
+        return if (dupeIds.isEmpty()) activities
+        else activities.map { if (it.id in dupeIds) it.copy(hasDuplicate = true) else it }
+    }
+
+    private fun isLikelyDuplicate(a: Activity, b: Activity): Boolean {
+        if (a.dataOriginPackage == b.dataOriginPackage) return false
+        val overlapStart = maxOf(a.startTime, b.startTime)
+        val overlapEnd = minOf(a.endTime, b.endTime)
+        if (!overlapEnd.isAfter(overlapStart)) return false
+        val overlapSec = ChronoUnit.SECONDS.between(overlapStart, overlapEnd).toDouble()
+        val shorter = minOf(a.durationSeconds, b.durationSeconds).toDouble()
+        return shorter > 0 && overlapSec / shorter > 0.5
     }
 }

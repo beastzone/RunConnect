@@ -43,8 +43,9 @@ object FormatUtils {
     fun formatDistanceMiles(meters: Double): String =
         "%.2f mi".format(meters / 1609.344)
 
-    fun formatElevation(meters: Double): String =
-        "%d m".format(meters.roundToInt())
+    fun formatElevation(meters: Double, useImperial: Boolean = false): String =
+        if (useImperial) "%d ft".format((meters * 3.28084).roundToInt())
+        else "%d m".format(meters.roundToInt())
 
     fun formatHeartRate(bpm: Int?): String =
         if (bpm != null) "$bpm bpm" else "--"
