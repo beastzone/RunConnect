@@ -71,7 +71,7 @@ Download the latest APK from the [Releases](https://github.com/beastzone/RunConn
 | Data Type | Source |
 |---|---|
 | Exercise sessions (runs, hikes, etc.) | Health Connect ← Garmin Connect / Withings |
-| GPS route points | Health Connect `readExerciseRoute()` |
+| GPS route points | Health Connect `ExerciseSessionRecord.exerciseRouteResult` |
 | Heart rate samples | Health Connect |
 | Resting heart rate | Health Connect `RestingHeartRateRecord` |
 | HRV (RMSSD) | Health Connect `HeartRateVariabilityRmssdRecord` |

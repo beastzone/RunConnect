@@ -17,7 +17,7 @@ import androidx.health.connect.client.records.SpeedRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.WeightRecord
 import androidx.health.connect.client.request.ReadRecordsRequest
-import androidx.health.connect.client.response.ExerciseRouteResult
+import androidx.health.connect.client.records.ExerciseRouteResult
 import androidx.health.connect.client.time.TimeRangeFilter
 import com.runconnect.app.domain.model.Activity
 import com.runconnect.app.domain.model.ActivityType
@@ -142,19 +142,20 @@ class HealthConnectManager @Inject constructor(
 
     suspend fun readExerciseRoute(sessionId: String): List<RoutePoint> {
         val c = client ?: return emptyList()
-        return when (val result = c.readExerciseRoute(sessionId)) {
-            is ExerciseRouteResult.Data -> result.exerciseRoute.route.map { loc ->
-                RoutePoint(
-                    latitude = loc.latitude,
-                    longitude = loc.longitude,
-                    altitudeMeters = loc.altitude?.inMeters,
-                    timestamp = loc.time,
-                )
+        return runCatching {
+            val record = c.readRecord(ExerciseSessionRecord::class, sessionId).record
+            when (val routeResult = record.exerciseRouteResult) {
+                is ExerciseRouteResult.Data -> routeResult.exerciseRoute.route.map { loc ->
+                    RoutePoint(
+                        latitude = loc.latitude,
+                        longitude = loc.longitude,
+                        altitudeMeters = loc.altitude?.inMeters,
+                        timestamp = loc.time,
+                    )
+                }
+                else -> emptyList()
             }
-            is ExerciseRouteResult.ConsentRequired -> emptyList()
-            is ExerciseRouteResult.NoData -> emptyList()
-            else -> emptyList()
-        }
+        }.getOrDefault(emptyList())
     }
 
     suspend fun readSleepSessions(
