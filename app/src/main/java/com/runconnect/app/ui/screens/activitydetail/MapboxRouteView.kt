@@ -96,7 +96,6 @@ fun MapboxRouteView(
         return
     }
 
-    val context = LocalContext.current
     val coordinates = remember(routePoints) {
         routePoints.map { Point.fromLngLat(it.longitude, it.latitude, it.altitudeMeters ?: 0.0) }
     }
