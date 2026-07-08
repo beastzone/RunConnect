@@ -164,6 +164,7 @@ private fun ActivityDetailContent(
             MapboxRouteView(
                 routePoints = activity.route,
                 isLoading = state.routeLoading,
+                consentRequired = state.routeConsentRequired,
                 modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp),
             )
         }

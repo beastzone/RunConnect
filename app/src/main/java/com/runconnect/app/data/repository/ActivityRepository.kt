@@ -1,6 +1,7 @@
 package com.runconnect.app.data.repository
 
 import com.runconnect.app.data.healthconnect.HealthConnectManager
+import com.runconnect.app.data.healthconnect.RouteResult
 import com.runconnect.app.domain.model.Activity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -59,13 +60,17 @@ class ActivityRepository @Inject constructor(
         return runCatching { healthConnectManager.readActivityById(id) }.getOrNull()
     }
 
-    // Loads route points for a specific activity on demand (separate from the list load).
-    suspend fun getActivityWithRoute(id: String): Activity? {
-        val activity = getActivityById(id) ?: return null
-        val route = runCatching {
+    // Returns (activity with route if available, consentRequired flag).
+    suspend fun getActivityWithRoute(id: String): Pair<Activity?, Boolean> {
+        val activity = getActivityById(id) ?: return null to false
+        val result = runCatching {
             healthConnectManager.readExerciseRoute(id)
-        }.getOrDefault(emptyList())
-        return if (route.isNotEmpty()) activity.copy(route = route) else activity
+        }.getOrDefault(RouteResult())
+        return if (result.points.isNotEmpty()) {
+            activity.copy(route = result.points) to false
+        } else {
+            activity to result.consentRequired
+        }
     }
 
     fun invalidateCache() {

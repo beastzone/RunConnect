@@ -36,6 +36,11 @@ import java.time.temporal.ChronoUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
+data class RouteResult(
+    val points: List<RoutePoint> = emptyList(),
+    val consentRequired: Boolean = false,
+)
+
 @Singleton
 class HealthConnectManager @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -140,22 +145,25 @@ class HealthConnectManager @Inject constructor(
     suspend fun readActivityById(id: String): Activity? =
         readActivities().firstOrNull { it.id == id }
 
-    suspend fun readExerciseRoute(sessionId: String): List<RoutePoint> {
-        val c = client ?: return emptyList()
+    suspend fun readExerciseRoute(sessionId: String): RouteResult {
+        val c = client ?: return RouteResult()
         return runCatching {
             val record = c.readRecord(ExerciseSessionRecord::class, sessionId).record
             when (val routeResult = record.exerciseRouteResult) {
-                is ExerciseRouteResult.Data -> routeResult.exerciseRoute.route.map { loc ->
-                    RoutePoint(
-                        latitude = loc.latitude,
-                        longitude = loc.longitude,
-                        altitudeMeters = loc.altitude?.inMeters,
-                        timestamp = loc.time,
-                    )
-                }
-                else -> emptyList()
+                is ExerciseRouteResult.Data -> RouteResult(
+                    points = routeResult.exerciseRoute.route.map { loc ->
+                        RoutePoint(
+                            latitude = loc.latitude,
+                            longitude = loc.longitude,
+                            altitudeMeters = loc.altitude?.inMeters,
+                            timestamp = loc.time,
+                        )
+                    }
+                )
+                is ExerciseRouteResult.ConsentRequired -> RouteResult(consentRequired = true)
+                else -> RouteResult()
             }
-        }.getOrDefault(emptyList())
+        }.getOrDefault(RouteResult())
     }
 
     suspend fun readSleepSessions(

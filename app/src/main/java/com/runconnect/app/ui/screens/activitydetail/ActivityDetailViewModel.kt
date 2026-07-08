@@ -25,6 +25,7 @@ data class ActivityDetailUiState(
     val hrChartData: List<Pair<Float, Int>> = emptyList(),
     val useImperial: Boolean = false,
     val routeLoading: Boolean = false,
+    val routeConsentRequired: Boolean = false,
 )
 
 @HiltViewModel
@@ -69,18 +70,22 @@ class ActivityDetailViewModel @Inject constructor(
                 routeLoading = true,
             )
 
-            // Load GPS route separately — may require user consent per-activity in HC
-            val activityWithRoute = runCatching {
+            // Load GPS route separately — may require per-activity consent in HC
+            val (activityWithRoute, consentRequired) = runCatching {
                 activityRepository.getActivityWithRoute(activityId)
-            }.getOrNull()
+            }.getOrDefault(null to false)
 
             if (activityWithRoute != null && activityWithRoute.route.isNotEmpty()) {
                 _uiState.value = _uiState.value.copy(
                     activity = activityWithRoute,
                     routeLoading = false,
+                    routeConsentRequired = false,
                 )
             } else {
-                _uiState.value = _uiState.value.copy(routeLoading = false)
+                _uiState.value = _uiState.value.copy(
+                    routeLoading = false,
+                    routeConsentRequired = consentRequired,
+                )
             }
         }
     }
