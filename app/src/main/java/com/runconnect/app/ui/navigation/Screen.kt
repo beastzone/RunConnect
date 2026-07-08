@@ -22,6 +22,9 @@ sealed class Screen(val route: String) {
         fun createRoute(activityId: String) = "activity_detail/$activityId"
     }
     object Sleep : Screen("sleep")
+    object SleepDetail : Screen("sleep_detail/{sessionId}") {
+        fun createRoute(sessionId: String) = "sleep_detail/$sessionId"
+    }
     object HeartRate : Screen("heart_rate")
     object BodyMetrics : Screen("body_metrics")
     object Settings : Screen("settings")

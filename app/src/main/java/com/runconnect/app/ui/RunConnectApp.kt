@@ -30,6 +30,7 @@ import com.runconnect.app.ui.screens.bodymetrics.BodyMetricsScreen
 import com.runconnect.app.ui.screens.dashboard.DashboardScreen
 import com.runconnect.app.ui.screens.heartrate.HeartRateScreen
 import com.runconnect.app.ui.screens.settings.SettingsScreen
+import com.runconnect.app.ui.screens.sleep.SleepDetailScreen
 import com.runconnect.app.ui.screens.sleep.SleepScreen
 import com.runconnect.app.ui.theme.Background
 import com.runconnect.app.ui.theme.CardDark
@@ -124,7 +125,18 @@ fun RunConnectApp() {
                 )
             }
             composable(Screen.Sleep.route) {
-                SleepScreen()
+                SleepScreen(
+                    onSessionClick = { id ->
+                        navController.navigate(Screen.SleepDetail.createRoute(id))
+                    }
+                )
+            }
+            composable(Screen.SleepDetail.route) { backStackEntry ->
+                val sessionId = backStackEntry.arguments?.getString("sessionId") ?: ""
+                SleepDetailScreen(
+                    sessionId = sessionId,
+                    onBack = { navController.popBackStack() },
+                )
             }
             composable(Screen.HeartRate.route) {
                 HeartRateScreen()

@@ -36,10 +36,31 @@ Download the latest APK from the [Releases](https://github.com/beastzone/RunConn
   - **Race predictions** via the Riegel formula (`T2 = T1 × (D2/D1)^1.06`) for 1 mi, 5K, 10K, half marathon, and full marathon
 
 ### Sleep Analytics
-- Sleep sessions from the last 30 days pulled from Health Connect
-- Per-night breakdown: Deep / Light / REM / Awake time
-- Color-coded stage timeline bar
-- 30-day averages: total sleep, deep sleep, REM, sleep efficiency
+- 90-day sleep sessions pulled from Health Connect — supports both Garmin Connect and Withings simultaneously
+- **Source toggle** — flip between Garmin / Withings / Combined view; all analytics recalculate per source
+- **Sleep overview card** — last-night total sleep, time in bed, efficiency, latency, WASO, awakenings, bedtime–wake window, sleep midpoint, and sleep score (0–100)
+- **Sleep score** — weighted composite: efficiency 40%, deep sleep % 30%, REM % 20%, optimal latency bonus 10%
+- **Interactive stage timeline** — Canvas-rendered color bands (Deep/Light/REM/Awake) with touch scrubbing; HR line overlay when data available
+- **Stage detail table** — per-stage duration, %, episode count, longest episode, and delta vs your historical averages
+- **Efficiency, latency, WASO, and midpoint** — computed from stage boundary data; latency supports a manual correction offset
+- **Bedtime consistency** — avg, earliest, latest, std-dev; weekday vs weekend split; social jet-lag indicator
+- **Wake-time consistency** — same breakdown as bedtime
+- **Sleep debt** — last-night deficit and 7-day cumulative debt vs your personal sleep need
+- **Personalized sleep need** — auto-detected as the 75th-percentile of your unrestricted nights; overridable in preferences
+- **Nap detection** — sessions < 3 h starting between 8 am–8 pm shown in a separate nap section, excluded from main analytics
+- **Overnight HR chart** — Canvas line chart with touch scrubbing; avg and lowest HR + time-of-lowest callouts
+- **Overnight HRV chart** — ms trend with avg and range
+- **Overnight respiration chart** — breaths/min trend with avg
+- **Overnight SpO2 chart** — %-saturation trend with 95% threshold line; avg, min, and minutes-below-threshold callouts; wellness disclaimer
+- **Sleep factor tags** — tag a night with Alcohol, Caffeine, Late Meal, Evening Workout, Medication, Stress, Illness, Screen Time, Travel, Meditation, or Reading
+- **Sleep environment notes** — free-text notes, room temperature, noise level (Silent/Low/Medium/High), light level (Dark/Dim/Light), travel toggle; auto-saved with 300 ms debounce
+- **Correlation view** — for each tag with ≥ 3 nights tagged, shows avg sleep duration and score with vs without the factor
+- **Smart recommendations** — rule-based cards flagging high WASO, long latency, inconsistent bedtimes, social jet-lag, low deep %, and high accumulated debt
+- **Bedtime recommendation** — calculated from desired wake time, sleep need, and avg latency
+- **Sleep prediction** — tonight's predicted duration and score based on 7-night rolling median
+- **Weekly reports** — last 4 ISO weeks: avg duration, avg score, avg debt, consistency, best/worst night
+- **Monthly summary** — avg duration, weekday vs weekend split, longest/shortest night
+- **Per-session detail screen** — tap any night to open a full-detail view with all of the above, navigable with the back button
 
 ### Heart Rate
 - HR zone distribution (Zone 1–5 based on % of max HR)
@@ -93,6 +114,8 @@ Download the latest APK from the [Releases](https://github.com/beastzone/RunConn
 | Elevation gain | Health Connect |
 | Weight | Health Connect `WeightRecord` ← Withings |
 | Body fat % | Health Connect `BodyFatRecord` ← Withings |
+| Overnight SpO2 | Health Connect `OxygenSaturationRecord` ← Garmin / Withings |
+| Overnight respiration | Health Connect `RespirationRateRecord` ← Garmin / Withings |
 
 ---
 
@@ -106,7 +129,7 @@ Download the latest APK from the [Releases](https://github.com/beastzone/RunConn
 | DI | Hilt |
 | Health data | Health Connect SDK 1.1.0-rc01 |
 | Maps | Mapbox Maps SDK v11 (3D terrain) |
-| Charts | Custom Canvas with touch scrubbing and axis labels (elevation, pace, HR, resting HR, HRV, weight, body fat) |
+| Charts | Custom Canvas with touch scrubbing and axis labels (elevation, pace, HR, resting HR, HRV, weight, body fat, sleep stage timeline, overnight HR/HRV/SpO2/respiration) |
 | Networking | Retrofit + OkHttp + Moshi |
 | Storage | DataStore Preferences + WorkManager (background sync) |
 | Race predictions | Riegel formula |
@@ -149,3 +172,5 @@ No local Android Studio required. Every push to `main` triggers a GitHub Actions
 | READ_VO2_MAX | VO2 max (display only) |
 | READ_WEIGHT | Body weight trend (Withings) |
 | READ_BODY_FAT | Body fat trend (Withings) |
+| READ_OXYGEN_SATURATION | Overnight SpO2 in sleep analytics |
+| READ_RESPIRATORY_RATE | Overnight breathing rate in sleep analytics |
