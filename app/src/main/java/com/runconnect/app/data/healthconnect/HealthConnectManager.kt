@@ -217,6 +217,7 @@ class HealthConnectManager @Inject constructor(
                 source = DataSource.HEALTH_CONNECT,
                 dataOriginPackage = session.metadata.dataOrigin.packageName,
                 completenessScore = completeness,
+                startZoneOffset = session.startZoneOffset,
             )
         }
     }

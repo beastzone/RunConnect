@@ -94,8 +94,8 @@ fun ActivityCard(
                         color = TextPrimary,
                     )
                     Text(
-                        text = FormatUtils.formatRelativeDate(activity.startTime) +
-                                " · " + FormatUtils.formatTime(activity.startTime),
+                        text = FormatUtils.formatRelativeDate(activity.startTime, activity.startZoneOffset) +
+                                " · " + FormatUtils.formatTime(activity.startTime, activity.startZoneOffset),
                         style = MaterialTheme.typography.bodySmall,
                         color = TextSecondary,
                     )

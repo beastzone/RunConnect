@@ -2,6 +2,9 @@ package com.runconnect.app.ui.screens.activities
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.WifiOff
+import androidx.compose.material3.Icon
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.runconnect.app.domain.model.ActivityType
 import com.runconnect.app.ui.components.ActivityCard
+import com.runconnect.app.ui.theme.AmberAccent
 import com.runconnect.app.ui.theme.Background
 import com.runconnect.app.ui.theme.CardDark
 import com.runconnect.app.ui.theme.TealPrimary
@@ -61,6 +65,29 @@ fun ActivitiesScreen(
                 style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                 color = TextPrimary,
             )
+        }
+
+        if (state.isOffline) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(AmberAccent.copy(alpha = 0.12f))
+                    .padding(horizontal = 20.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.WifiOff,
+                    contentDescription = null,
+                    tint = AmberAccent,
+                    modifier = Modifier.size(14.dp),
+                )
+                Text(
+                    "Offline · Garmin/Withings may not have synced recently",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = AmberAccent,
+                )
+            }
         }
 
         // Activity type filter chips

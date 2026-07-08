@@ -151,8 +151,8 @@ private fun ActivityDetailContent(
                         )
                         val sourceLabel = packageToDisplayName(activity.dataOriginPackage)
                         Text(
-                            FormatUtils.formatFullDate(activity.startTime) + " · " +
-                                    FormatUtils.formatTime(activity.startTime) +
+                            FormatUtils.formatFullDate(activity.startTime, activity.startZoneOffset) + " · " +
+                                    FormatUtils.formatTime(activity.startTime, activity.startZoneOffset) +
                                     if (sourceLabel.isNotEmpty()) " · $sourceLabel" else "",
                             style = MaterialTheme.typography.bodySmall,
                             color = TextSecondary,

@@ -2,6 +2,7 @@ package com.runconnect.app.ui.screens.activities
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.runconnect.app.data.connectivity.ConnectivityRepository
 import com.runconnect.app.data.preferences.AppPreferences
 import com.runconnect.app.data.repository.ActivityRepository
 import com.runconnect.app.domain.model.Activity
@@ -24,12 +25,14 @@ data class ActivitiesUiState(
     val sourceFilter: String? = null,
     val availableSources: List<Pair<String, String>> = emptyList(),
     val useImperial: Boolean = false,
+    val isOffline: Boolean = false,
 )
 
 @HiltViewModel
 class ActivitiesViewModel @Inject constructor(
     private val activityRepository: ActivityRepository,
     private val appPreferences: AppPreferences,
+    private val connectivityRepository: ConnectivityRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ActivitiesUiState())
@@ -37,6 +40,11 @@ class ActivitiesViewModel @Inject constructor(
 
     init {
         loadActivities()
+        viewModelScope.launch {
+            connectivityRepository.isOnline.collect { online ->
+                _uiState.value = _uiState.value.copy(isOffline = !online)
+            }
+        }
     }
 
     fun refresh() = loadActivities(forceRefresh = true)

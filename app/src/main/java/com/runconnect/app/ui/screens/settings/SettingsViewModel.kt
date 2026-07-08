@@ -3,6 +3,7 @@ package com.runconnect.app.ui.screens.settings
 import androidx.health.connect.client.HealthConnectClient
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.runconnect.app.data.connectivity.ConnectivityRepository
 import com.runconnect.app.data.healthconnect.HealthConnectManager
 import com.runconnect.app.data.healthconnect.PermissionInfo
 import com.runconnect.app.data.preferences.AppPreferences
@@ -42,6 +43,7 @@ data class SettingsUiState(
     val lastSyncSummary: String? = null,
     val importProgress: ImportProgress = ImportProgress(),
     val historyImportedLabel: String? = null,
+    val isOffline: Boolean = false,
 ) {
     val healthConnectStatusLabel: String get() = when (healthConnectSdkStatus) {
         HealthConnectClient.SDK_AVAILABLE -> "Available (SDK ${healthConnectSdkStatus})"
@@ -58,6 +60,7 @@ class SettingsViewModel @Inject constructor(
     private val healthConnectManager: HealthConnectManager,
     private val activityRepository: ActivityRepository,
     private val syncScheduler: SyncScheduler,
+    private val connectivityRepository: ConnectivityRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -123,6 +126,11 @@ class SettingsViewModel @Inject constructor(
             }
         }
         viewModelScope.launch { refreshPermissionsInternal() }
+        viewModelScope.launch {
+            connectivityRepository.isOnline.collect { online ->
+                _uiState.value = _uiState.value.copy(isOffline = !online)
+            }
+        }
     }
 
     fun setUseImperial(value: Boolean) = viewModelScope.launch {

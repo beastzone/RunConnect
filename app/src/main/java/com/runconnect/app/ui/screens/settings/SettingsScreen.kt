@@ -62,6 +62,7 @@ import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.runconnect.app.ui.theme.AmberAccent
 import com.runconnect.app.ui.theme.Background
 import com.runconnect.app.ui.theme.BorderColor
 import com.runconnect.app.ui.theme.CardDark
@@ -365,6 +366,14 @@ private fun SyncSection(state: SettingsUiState, viewModel: SettingsViewModel) {
                 label = "Last Background Sync",
                 value = state.lastBackgroundSyncLabel,
                 valueColor = TextSecondary,
+            )
+        }
+        if (state.isOffline) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Offline · new data won't sync until connectivity is restored",
+                style = MaterialTheme.typography.labelSmall,
+                color = AmberAccent,
             )
         }
     }

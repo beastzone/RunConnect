@@ -4,6 +4,7 @@ import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
 
@@ -53,14 +54,14 @@ object FormatUtils {
     fun formatCalories(kcal: Int?): String =
         if (kcal != null) "$kcal kcal" else "--"
 
-    fun formatDate(instant: Instant): String =
-        dateFormatter.format(instant.atZone(ZoneId.systemDefault()))
+    fun formatDate(instant: Instant, zone: ZoneOffset? = null): String =
+        dateFormatter.format(instant.atZone(zone ?: ZoneId.systemDefault()))
 
-    fun formatFullDate(instant: Instant): String =
-        fullDateFormatter.format(instant.atZone(ZoneId.systemDefault()))
+    fun formatFullDate(instant: Instant, zone: ZoneOffset? = null): String =
+        fullDateFormatter.format(instant.atZone(zone ?: ZoneId.systemDefault()))
 
-    fun formatTime(instant: Instant): String =
-        timeFormatter.format(instant.atZone(ZoneId.systemDefault()))
+    fun formatTime(instant: Instant, zone: ZoneOffset? = null): String =
+        timeFormatter.format(instant.atZone(zone ?: ZoneId.systemDefault()))
 
     fun formatSleepDuration(minutes: Long): String {
         val h = minutes / 60
@@ -68,9 +69,10 @@ object FormatUtils {
         return if (h > 0) "${h}h ${m}m" else "${m}m"
     }
 
-    fun formatRelativeDate(instant: Instant): String {
-        val today = LocalDate.now()
-        val date = instant.atZone(ZoneId.systemDefault()).toLocalDate()
+    fun formatRelativeDate(instant: Instant, zone: ZoneOffset? = null): String {
+        val zoneId: ZoneId = zone ?: ZoneId.systemDefault()
+        val today = LocalDate.now(zoneId)
+        val date = instant.atZone(zoneId).toLocalDate()
         return when {
             date == today -> "Today"
             date == today.minusDays(1) -> "Yesterday"

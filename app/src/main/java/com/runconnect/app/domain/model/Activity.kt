@@ -1,6 +1,7 @@
 package com.runconnect.app.domain.model
 
 import java.time.Instant
+import java.time.ZoneOffset
 
 data class Activity(
     val id: String,
@@ -24,6 +25,7 @@ data class Activity(
     val dataOriginPackage: String = "",
     val completenessScore: Int = 0,
     val hasDuplicate: Boolean = false,
+    val startZoneOffset: ZoneOffset? = null,
 )
 
 enum class ActivityType(val label: String) {
