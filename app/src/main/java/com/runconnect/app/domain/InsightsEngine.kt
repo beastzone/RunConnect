@@ -1,5 +1,6 @@
 package com.runconnect.app.domain
 
+import com.runconnect.app.domain.analytics.ActivityHrAnalytics
 import com.runconnect.app.domain.model.Activity
 import com.runconnect.app.domain.model.DailyStats
 import com.runconnect.app.domain.model.HealthInsight
@@ -23,6 +24,7 @@ class InsightsEngine @Inject constructor() {
         sleepInsights(sleepSessions, insights)
         trainingInsights(activities, insights)
         recoveryInsights(dailyStats, insights)
+        hrRecoveryTrendInsight(activities, insights)
         return insights.sortedBy { it.priority.ordinal }.take(5)
     }
 
@@ -139,6 +141,36 @@ class InsightsEngine @Inject constructor() {
                     actionHint = "Easy training and 8h sleep will restore HRV.",
                 ))
             }
+        }
+    }
+
+    private fun hrRecoveryTrendInsight(activities: List<Activity>, out: MutableList<HealthInsight>) {
+        // Require at least 8 activities with HR samples and enough duration for a post-workout window
+        val eligible = activities
+            .filter { it.heartRateSamples.size >= 20 && it.durationSeconds >= 1200 }
+            .takeLast(10)
+        if (eligible.size < 6) return
+
+        val drops = eligible.mapNotNull { activity ->
+            runCatching {
+                ActivityHrAnalytics.computeEndOfActivityRecovery(
+                    activity.heartRateSamples, activity.endTime
+                )?.drop1Min
+            }.getOrNull()
+        }
+        if (drops.size < 6) return
+
+        val recentAvg = drops.takeLast(3).average()
+        val olderAvg = drops.take(drops.size - 3).average()
+
+        if (olderAvg > 10 && recentAvg < olderAvg * 0.70) {
+            out.add(HealthInsight(
+                type = InsightType.RECOVERY,
+                priority = InsightPriority.MEDIUM,
+                title = "HR Recovery Slowing",
+                body = "Your 1-min post-workout HR drop has fallen from ${olderAvg.toInt()} to ${recentAvg.toInt()} bpm recently. Slower recovery can signal accumulated fatigue.",
+                actionHint = "Check the Heart Rate screen for your recovery trend.",
+            ))
         }
     }
 }

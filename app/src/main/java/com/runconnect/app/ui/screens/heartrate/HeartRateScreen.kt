@@ -49,6 +49,7 @@ import com.runconnect.app.domain.model.HrZone
 import com.runconnect.app.domain.model.LowRhrAlert
 import com.runconnect.app.domain.model.RhrRollingAvgs
 import com.runconnect.app.domain.model.WorkoutRecoveryPoint
+import com.runconnect.app.ui.components.HrCalendarHeatmap
 import com.runconnect.app.ui.components.HrZoneBar
 import com.runconnect.app.ui.components.SectionHeader
 import com.runconnect.app.ui.components.SmallStatItem
@@ -217,6 +218,20 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = hiltViewModel()) {
                         avgs = state.rhrRollingAvgs,
                         modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp),
                     )
+                }
+            }
+
+            // RHR Calendar Heatmap (12.9)
+            if (state.rhrCalendarData.size >= 7) {
+                item {
+                    Column(modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp)) {
+                        SectionHeader("Resting HR Calendar (90 days)")
+                        Spacer(Modifier.height(10.dp))
+                        HrCalendarHeatmap(
+                            data = state.rhrCalendarData,
+                            modifier = Modifier.fillMaxWidth().height(120.dp),
+                        )
+                    }
                 }
             }
 

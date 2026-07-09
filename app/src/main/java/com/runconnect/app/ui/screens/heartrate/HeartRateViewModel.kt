@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.ZoneOffset
 import javax.inject.Inject
 import kotlin.math.sqrt
 
@@ -59,6 +60,8 @@ data class HeartRateUiState(
     // 12.2 / 12.1 Today's HR
     val todayHrSamples: List<HeartRateSample> = emptyList(),
     val currentHrBpm: Int? = null,
+    // 12.9 Calendar heatmap data (date → rhr bpm)
+    val rhrCalendarData: List<Pair<LocalDate, Int>> = emptyList(),
 )
 
 @HiltViewModel
@@ -215,6 +218,14 @@ class HeartRateViewModel @Inject constructor(
                     // Today's HR
                     val currentBpm = todayHr.lastOrNull()?.bpm?.toInt()
 
+                    // Calendar heatmap data (12.9) — one point per day, most recent wins
+                    val calendarData = rhrHistory90
+                        .map { (instant, bpm) ->
+                            instant.atZone(ZoneId.systemDefault()).toLocalDate() to bpm
+                        }
+                        .sortedBy { it.first }
+                        .distinctBy { it.first }
+
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         avgRestingHr = if (avgRhrFromHistory > 0) avgRhrFromHistory
@@ -234,6 +245,7 @@ class HeartRateViewModel @Inject constructor(
                         hrByActivityType = hrByType,
                         todayHrSamples = todayHr,
                         currentHrBpm = currentBpm,
+                        rhrCalendarData = calendarData,
                     )
                 }.onFailure { e ->
                     _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)

@@ -15,7 +15,7 @@ Download the latest APK from the [Releases](https://github.com/beastzone/RunConn
 ### Home Dashboard
 - **Health Score** — composite score (0–100) broken down into Sleep, Activity, and Recovery rings
 - **Today's metrics** — steps, active calories, last night's sleep, resting HR, HRV (when available from Withings/Garmin)
-- **AI-style insights** — rule-based coaching cards: training load warnings (10% rule), sleep duration/quality, recovery alerts (elevated resting HR, low HRV), consistency streaks
+- **AI-style insights** — rule-based coaching cards: training load warnings (10% rule), sleep duration/quality, recovery alerts (elevated resting HR, low HRV, slowing post-workout HR recovery), consistency streaks
 - Weekly summary: distance, activity count, time, day streak
 - 5 most recent activities with type, distance, duration, pace, heart rate
 - **Pull-to-refresh** — swipe down to fetch the latest data from Health Connect
@@ -88,6 +88,7 @@ Download the latest APK from the [Releases](https://github.com/beastzone/RunConn
 - **HRV trend chart** — X/Y axis labels + touch scrubbing (ms tooltip with date)
 - **HR recovery trends** — 1-min and 5-min post-workout HR drop listed per session; color-coded by drop magnitude (12.14)
 - **HR by activity type** — avg HR, max HR, and count per activity type; sorted by frequency (12.16)
+- **Resting HR calendar heatmap** — 90-day GitHub-style grid (13 weeks × 7 days); TealPrimary (low = good) → CoralAccent (elevated); tap any cell for date + RHR value (12.9)
 - Max HR and zone model (% Max HR / HRR) configurable in Settings
 
 ### Body Metrics _(new)_
