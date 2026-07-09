@@ -143,10 +143,51 @@ Download the latest APK from the [Releases](https://github.com/beastzone/RunConn
 | Maps | Mapbox Maps SDK v11 (3D terrain) |
 | Charts | Custom Canvas with touch scrubbing and axis labels (elevation, pace, HR, resting HR, HRV, weight, body fat, sleep stage timeline, overnight HR/HRV/SpO2/respiration) |
 | Networking | Retrofit + OkHttp + Moshi |
-| Storage | DataStore Preferences + WorkManager (background sync) |
+| Storage | Room DB v1 (`runconnect_db`) + DataStore Preferences (`runconnect_prefs`, 18 keys) + WorkManager (background sync) |
 | Race predictions | Riegel formula |
 | Insights | Rule-based engine (sleep, training load, recovery, consistency) |
 | Build | GitHub Actions (Gradle 8.12, AGP 8.9.1, compileSdk 36) |
+
+---
+
+## Update Safety
+
+Every app update is a **non-destructive in-place upgrade**. Nothing is ever deleted on update:
+
+| Preserved across updates | Mechanism |
+|---|---|
+| Unit preference (mi/km, lbs/kg) | DataStore — key string never changes |
+| Health Connect permissions | HC SDK preserves them on update |
+| HC change token (incremental sync state) | Room `sync_state` table (DataStore fallback for first upgrade) |
+| Sync timestamps | DataStore |
+| Sleep target, annotations, tags | DataStore |
+| Activity + sleep data | Room DB (upsert — never truncate) |
+| Sleep chart range preference | DataStore `sleep_chart_range` key |
+| First-install version tracking | DataStore `app_first_install_version_code` |
+
+**Rules enforced in code:**
+- `fallbackToDestructiveMigration()` is **never used** — future DB version bumps require an explicit `Migration` object
+- DataStore keys are append-only; existing key strings never renamed or removed
+- Room DB excluded from backup (large, device-specific); DataStore prefs included
+
+### Room Database (v1)
+
+File: `runconnect_db` · Schema exported to `app/schemas/`
+
+| Table | Purpose |
+|---|---|
+| `activities` | Exercise session scalars + laps JSON |
+| `activity_hr_samples` | Per-activity heart-rate samples (FK → activities, CASCADE) |
+| `route_points` | GPS route points (FK → activities, CASCADE) |
+| `sleep_sessions` | Sleep session boundaries |
+| `sleep_stages` | Sleep stage segments (FK → sleep_sessions, CASCADE) |
+| `sync_state` | Per-data-type HC change token + sync timestamps |
+
+### DataStore (`runconnect_prefs`, 18 keys)
+
+Settings schema version: `1`
+
+Keys added in v1.1.0: `app_first_install_version_code`, `app_last_launched_version_code`, `app_settings_schema_version`, `onboarding_complete`, `sleep_chart_range`
 
 ---
 
@@ -162,6 +203,10 @@ No local Android Studio required. Every push to `main` triggers a GitHub Actions
 | `MAPBOX_ACCESS_TOKEN` | Mapbox public token (`pk.…`) baked into the APK |
 | `GARMIN_CONSUMER_KEY` | Optional — Garmin OAuth consumer key |
 | `GARMIN_CONSUMER_SECRET` | Optional — Garmin OAuth consumer secret |
+| `RELEASE_KEYSTORE_PATH` | Path to keystore file for signed release APK |
+| `RELEASE_KEYSTORE_PASSWORD` | Keystore password |
+| `RELEASE_KEY_ALIAS` | Key alias inside the keystore |
+| `RELEASE_KEY_PASSWORD` | Key password |
 
 ---
 
