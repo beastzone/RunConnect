@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Android 12+ cloud-backup and device-transfer rules.
+    Include user preferences; exclude the Room DB (large, device-specific, rebuilt from HC on first launch).
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="file" path="datastore/runconnect_prefs.preferences_pb"/>
+        <exclude domain="database" path="runconnect_db"/>
+    </cloud-backup>
+    <device-transfer>
+        <include domain="file" path="datastore/runconnect_prefs.preferences_pb"/>
+        <exclude domain="database" path="runconnect_db"/>
+    </device-transfer>
+</data-extraction-rules>

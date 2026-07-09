@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Android 11 and below full-backup rules.
+    DataStore is a single proto file — we include the whole file and rely on the
+    token-expiry recovery path in ActivityRepository to refresh stale HC tokens after restore.
+-->
+<full-backup-content>
+    <include domain="file" path="datastore/runconnect_prefs.preferences_pb"/>
+    <exclude domain="file" path="databases/runconnect_db"/>
+    <exclude domain="file" path="databases/runconnect_db-shm"/>
+    <exclude domain="file" path="databases/runconnect_db-wal"/>
+</full-backup-content>

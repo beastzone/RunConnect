@@ -14,8 +14,8 @@ android {
         applicationId = "com.runconnect.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
 
         // Mapbox public token — replace with your token from account.mapbox.com
         manifestPlaceholders["MAPBOX_ACCESS_TOKEN"] =
@@ -26,11 +26,22 @@ android {
             "\"${project.findProperty("GARMIN_CONSUMER_KEY") ?: ""}\"")
         buildConfigField("String", "GARMIN_CONSUMER_SECRET",
             "\"${project.findProperty("GARMIN_CONSUMER_SECRET") ?: ""}\"")
+        buildConfigField("int", "DATABASE_VERSION", "1")
+    }
+
+    signingConfigs {
+        create("release") {
+            storeFile = (project.findProperty("RELEASE_KEYSTORE_PATH") as String?)?.let { file(it) }
+            storePassword = project.findProperty("RELEASE_KEYSTORE_PASSWORD") as String? ?: ""
+            keyAlias = project.findProperty("RELEASE_KEY_ALIAS") as String? ?: ""
+            keyPassword = project.findProperty("RELEASE_KEY_PASSWORD") as String? ?: ""
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = true
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -55,6 +66,10 @@ android {
         compose = true
         buildConfig = true
     }
+}
+
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {
