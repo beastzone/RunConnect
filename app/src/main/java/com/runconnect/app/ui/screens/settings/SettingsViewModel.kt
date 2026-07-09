@@ -12,6 +12,7 @@ import com.runconnect.app.data.remote.garmin.GarminAuthManager
 import com.runconnect.app.data.repository.ActivityRepository
 import com.runconnect.app.data.repository.ImportProgress
 import com.runconnect.app.data.sync.SyncScheduler
+import com.runconnect.app.domain.model.ZoneModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -47,6 +48,8 @@ data class SettingsUiState(
     val isOffline: Boolean = false,
     val hcConnectionStatus: HealthConnectStatus = HealthConnectStatus.NEVER_CONNECTED,
     val settingsSchemaVersion: Int = 0,
+    val zoneModel: ZoneModel = ZoneModel.MAX_HR,
+    val restingHrOverride: Int = 0,
 ) {
     val healthConnectStatusLabel: String get() = when (healthConnectSdkStatus) {
         HealthConnectClient.SDK_AVAILABLE -> "Available (SDK ${healthConnectSdkStatus})"
@@ -139,6 +142,16 @@ class SettingsViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(settingsSchemaVersion = version)
             }
         }
+        viewModelScope.launch {
+            appPreferences.zoneModel.collect { model ->
+                _uiState.value = _uiState.value.copy(zoneModel = model)
+            }
+        }
+        viewModelScope.launch {
+            appPreferences.restingHrOverride.collect { bpm ->
+                _uiState.value = _uiState.value.copy(restingHrOverride = bpm)
+            }
+        }
     }
 
     fun setUseImperial(value: Boolean) = viewModelScope.launch {
@@ -204,6 +217,14 @@ class SettingsViewModel @Inject constructor(
 
     fun setDataDaysBack(days: Int) = viewModelScope.launch {
         appPreferences.setDataDaysBack(days)
+    }
+
+    fun setZoneModel(model: ZoneModel) = viewModelScope.launch {
+        appPreferences.setZoneModel(model)
+    }
+
+    fun setRestingHrOverride(bpm: Int) = viewModelScope.launch {
+        appPreferences.setRestingHrOverride(bpm)
     }
 
     val requiredPermissions: Set<String>

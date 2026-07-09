@@ -8,6 +8,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -62,7 +63,11 @@ import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
 import com.runconnect.app.BuildConfig
 import com.runconnect.app.data.db.AppDatabase
+import com.runconnect.app.domain.model.HrZone
+import com.runconnect.app.domain.model.ZoneModel
+import com.runconnect.app.domain.model.computeHrZone
 import com.runconnect.app.domain.scoring.SleepScoreWeights
+import com.runconnect.app.ui.components.uiColor
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -154,6 +159,11 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                     colors = textFieldColors(),
                 )
             }
+        }
+
+        // --- HR Zone Model ---
+        item {
+            HrZoneModelSection(state = state, viewModel = viewModel)
         }
 
         // --- Health Connect ---
@@ -520,6 +530,96 @@ private fun HistoricalImportSection(state: SettingsUiState, viewModel: SettingsV
                 border = androidx.compose.foundation.BorderStroke(1.dp, TealPrimary),
             ) {
                 Text("Import 5 Years of History")
+            }
+        }
+    }
+}
+
+@Composable
+private fun HrZoneModelSection(state: SettingsUiState, viewModel: SettingsViewModel) {
+    var restingHrText by remember(state.restingHrOverride) {
+        mutableStateOf(if (state.restingHrOverride > 0) state.restingHrOverride.toString() else "")
+    }
+    SettingsSection("Heart Rate Zones") {
+        Text(
+            "Choose how HR zones are calculated",
+            style = MaterialTheme.typography.bodySmall,
+            color = TextSecondary,
+        )
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(ZoneModel.MAX_HR to "% Max HR", ZoneModel.HRR to "Heart Rate Reserve").forEach { (model, label) ->
+                FilterChip(
+                    selected = state.zoneModel == model,
+                    onClick = { viewModel.setZoneModel(model) },
+                    label = { Text(label, style = MaterialTheme.typography.labelMedium) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = TealPrimary.copy(alpha = 0.2f),
+                        selectedLabelColor = TealPrimary,
+                        labelColor = TextSecondary,
+                    ),
+                    border = FilterChipDefaults.filterChipBorder(
+                        enabled = true,
+                        selected = state.zoneModel == model,
+                        selectedBorderColor = TealPrimary,
+                        borderColor = BorderColor,
+                    ),
+                )
+            }
+        }
+        if (state.zoneModel == ZoneModel.HRR) {
+            Spacer(Modifier.height(10.dp))
+            OutlinedTextField(
+                value = restingHrText,
+                onValueChange = { v ->
+                    restingHrText = v
+                    val bpm = v.toIntOrNull() ?: 0
+                    viewModel.setRestingHrOverride(bpm)
+                },
+                label = { Text("Resting HR override (bpm)", color = TextSecondary) },
+                placeholder = { Text("Auto-detect from Health Connect", color = TextSecondary) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth(),
+                colors = textFieldColors(),
+            )
+        }
+        Spacer(Modifier.height(14.dp))
+        // Zone threshold preview table
+        val maxHr = state.maxHeartRate
+        val restingHr = if (state.restingHrOverride > 0) state.restingHrOverride else 60
+        val thresholds: List<Pair<HrZone, String>> = when (state.zoneModel) {
+            ZoneModel.MAX_HR -> listOf(
+                HrZone.ZONE_1 to "< ${(maxHr * 0.60).toInt()} bpm  (< 60%)",
+                HrZone.ZONE_2 to "${(maxHr * 0.60).toInt()}–${(maxHr * 0.70).toInt()} bpm  (60–70%)",
+                HrZone.ZONE_3 to "${(maxHr * 0.70).toInt()}–${(maxHr * 0.80).toInt()} bpm  (70–80%)",
+                HrZone.ZONE_4 to "${(maxHr * 0.80).toInt()}–${(maxHr * 0.90).toInt()} bpm  (80–90%)",
+                HrZone.ZONE_5 to "> ${(maxHr * 0.90).toInt()} bpm  (> 90%)",
+            )
+            ZoneModel.HRR -> {
+                val reserve = maxHr - restingHr
+                listOf(
+                    HrZone.ZONE_1 to "< ${restingHr + (reserve * 0.50).toInt()} bpm  (< 50% HRR)",
+                    HrZone.ZONE_2 to "${restingHr + (reserve * 0.50).toInt()}–${restingHr + (reserve * 0.60).toInt()} bpm  (50–60%)",
+                    HrZone.ZONE_3 to "${restingHr + (reserve * 0.60).toInt()}–${restingHr + (reserve * 0.70).toInt()} bpm  (60–70%)",
+                    HrZone.ZONE_4 to "${restingHr + (reserve * 0.70).toInt()}–${restingHr + (reserve * 0.85).toInt()} bpm  (70–85%)",
+                    HrZone.ZONE_5 to "> ${restingHr + (reserve * 0.85).toInt()} bpm  (> 85%)",
+                )
+            }
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            thresholds.forEach { (zone, range) ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Box(modifier = Modifier.size(8.dp).clip(RoundedCornerShape(4.dp)).background(zone.uiColor))
+                        Text(zone.label, style = MaterialTheme.typography.bodySmall, color = TextPrimary)
+                    }
+                    Text(range, style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                }
             }
         }
     }

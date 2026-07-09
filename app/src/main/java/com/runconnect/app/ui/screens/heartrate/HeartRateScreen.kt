@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -40,12 +39,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.runconnect.app.ui.components.HrZoneBar
 import com.runconnect.app.ui.components.axisLabelStyle
 import com.runconnect.app.ui.components.chartScrubber
 import com.runconnect.app.ui.components.drawScrubberTooltip
 import com.runconnect.app.ui.components.epochSecondsToMonthDay
+import com.runconnect.app.ui.components.uiColor
 import kotlin.math.roundToInt
-import com.runconnect.app.domain.model.HeartRateZoneSummary
 import com.runconnect.app.domain.model.HrZone
 import com.runconnect.app.ui.components.SectionHeader
 import com.runconnect.app.ui.components.SmallStatItem
@@ -57,11 +57,6 @@ import com.runconnect.app.ui.theme.TealPrimary
 import com.runconnect.app.ui.theme.TextPrimary
 import com.runconnect.app.ui.theme.TextSecondary
 import com.runconnect.app.ui.theme.PurpleAccent
-import com.runconnect.app.ui.theme.ZoneAerobic
-import com.runconnect.app.ui.theme.ZoneEasy
-import com.runconnect.app.ui.theme.ZoneMax
-import com.runconnect.app.ui.theme.ZoneTempo
-import com.runconnect.app.ui.theme.ZoneThreshold
 
 @Composable
 fun HeartRateScreen(viewModel: HeartRateViewModel = hiltViewModel()) {
@@ -282,36 +277,6 @@ private fun RestingHrChart(data: List<Pair<Long, Int>>, modifier: Modifier = Mod
     }
 }
 
-@Composable
-private fun HrZoneBar(summary: HeartRateZoneSummary) {
-    val zoneColor = summary.zone.uiColor
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            summary.zone.label,
-            style = MaterialTheme.typography.labelMedium,
-            color = zoneColor,
-            modifier = Modifier.width(80.dp),
-        )
-        Box(
-            modifier = Modifier.weight(1f).height(8.dp).clip(RoundedCornerShape(4.dp)).background(CardDark)
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .fillMaxWidth(summary.percentOfTotal.coerceIn(0f, 1f))
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(zoneColor)
-            )
-        }
-        Spacer(Modifier.width(8.dp))
-        Text(
-            "${summary.totalMinutes}min",
-            style = MaterialTheme.typography.labelSmall,
-            color = TextSecondary,
-            modifier = Modifier.width(48.dp),
-        )
-    }
-}
 
 @Composable
 private fun ZoneInfoRow(zone: HrZone, range: String, description: String) {
@@ -426,11 +391,3 @@ private fun HrvChart(data: List<Pair<Long, Double>>, modifier: Modifier = Modifi
     }
 }
 
-val HrZone.uiColor: Color
-    get() = when (this) {
-        HrZone.ZONE_1 -> ZoneEasy
-        HrZone.ZONE_2 -> ZoneAerobic
-        HrZone.ZONE_3 -> ZoneTempo
-        HrZone.ZONE_4 -> ZoneThreshold
-        HrZone.ZONE_5 -> ZoneMax
-    }

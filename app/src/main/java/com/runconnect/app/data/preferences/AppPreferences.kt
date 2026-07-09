@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.runconnect.app.domain.model.ZoneModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -37,6 +38,9 @@ class AppPreferences @Inject constructor(
         private val KEY_ONBOARDING_COMPLETE = booleanPreferencesKey("onboarding_complete")
         // Persistent UI state
         private val KEY_SLEEP_CHART_RANGE = stringPreferencesKey("sleep_chart_range")
+        // HR zone model settings — appended, existing keys unchanged
+        private val KEY_ZONE_MODEL = stringPreferencesKey("hr_zone_model")
+        private val KEY_RESTING_HR_OVERRIDE = intPreferencesKey("resting_hr_override")
     }
 
     val useImperial: Flow<Boolean> = dataStore.data.map { it[KEY_USE_IMPERIAL] ?: false }
@@ -82,4 +86,12 @@ class AppPreferences @Inject constructor(
     suspend fun setSettingsSchemaVersion(v: Int) { dataStore.edit { it[KEY_SETTINGS_SCHEMA] = v } }
     suspend fun setOnboardingComplete(done: Boolean) { dataStore.edit { it[KEY_ONBOARDING_COMPLETE] = done } }
     suspend fun setSleepChartRange(range: String) { dataStore.edit { it[KEY_SLEEP_CHART_RANGE] = range } }
+
+    val zoneModel: Flow<ZoneModel> = dataStore.data.map {
+        when (it[KEY_ZONE_MODEL]) { "HRR" -> ZoneModel.HRR else -> ZoneModel.MAX_HR }
+    }
+    val restingHrOverride: Flow<Int> = dataStore.data.map { it[KEY_RESTING_HR_OVERRIDE] ?: 0 }
+
+    suspend fun setZoneModel(model: ZoneModel) { dataStore.edit { it[KEY_ZONE_MODEL] = model.name } }
+    suspend fun setRestingHrOverride(bpm: Int) { dataStore.edit { it[KEY_RESTING_HR_OVERRIDE] = bpm } }
 }

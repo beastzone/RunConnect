@@ -146,6 +146,7 @@ Download the latest APK from the [Releases](https://github.com/beastzone/RunConn
 | Storage | Room DB v1 (`runconnect_db`) + DataStore Preferences (`runconnect_prefs`, 18 keys) + WorkManager (background sync) |
 | Race predictions | Riegel formula |
 | Insights | Rule-based engine (sleep, training load, recovery, consistency) |
+| HR Zone Models | % Max HR (default) and Heart Rate Reserve (HRR) — configurable in Settings |
 | Build | GitHub Actions (Gradle 8.12, AGP 8.9.1, compileSdk 36, lifecycle-process 2.8.6) |
 
 ---

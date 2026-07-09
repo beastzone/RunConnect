@@ -7,6 +7,7 @@ import com.runconnect.app.data.preferences.AppPreferences
 import com.runconnect.app.data.repository.ActivityRepository
 import com.runconnect.app.domain.model.HeartRateZoneSummary
 import com.runconnect.app.domain.model.HrZone
+import com.runconnect.app.domain.model.ZoneModel
 import com.runconnect.app.domain.model.computeHrZone
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
@@ -26,6 +27,8 @@ data class HeartRateUiState(
     val restingHrHistory: List<Pair<Long, Int>> = emptyList(),
     val hrvHistory: List<Pair<Long, Double>> = emptyList(),
     val maxHrSetting: Int = 190,
+    val zoneModel: ZoneModel = ZoneModel.MAX_HR,
+    val restingHrOverride: Int = 0,
 )
 
 @HiltViewModel
@@ -47,7 +50,14 @@ class HeartRateViewModel @Inject constructor(
     private fun loadData() {
         viewModelScope.launch {
             val maxHr = appPreferences.maxHeartRate.first()
-            _uiState.value = _uiState.value.copy(isLoading = true, maxHrSetting = maxHr)
+            val zoneModel = appPreferences.zoneModel.first()
+            val restingHrOverride = appPreferences.restingHrOverride.first()
+            _uiState.value = _uiState.value.copy(
+                isLoading = true,
+                maxHrSetting = maxHr,
+                zoneModel = zoneModel,
+                restingHrOverride = restingHrOverride,
+            )
 
             // Load dedicated resting HR + HRV records in parallel with activity load
             val restingHrDeferred = async {
@@ -61,31 +71,33 @@ class HeartRateViewModel @Inject constructor(
                 val restingHrHistory = restingHrDeferred.await()
                 val hrvRaw = hrvDeferred.await()
 
+                // Effective resting HR for HRR zone model
+                val avgRhrFromHistory = if (restingHrHistory.isNotEmpty())
+                    restingHrHistory.map { it.second }.average().toInt() else 0
+                val effectiveRestingHr = if (restingHrOverride > 0) restingHrOverride
+                    else if (avgRhrFromHistory > 0) avgRhrFromHistory else 60
+
                 result.onSuccess { activities ->
                     val zoneMinutes = mutableMapOf<HrZone, Long>()
                     activities.forEach { activity ->
                         activity.heartRateSamples.forEach { sample ->
-                            val zone = computeHrZone(sample.bpm.toInt(), maxHr)
+                            val zone = computeHrZone(sample.bpm.toInt(), maxHr, zoneModel, effectiveRestingHr)
                             zoneMinutes[zone] = (zoneMinutes[zone] ?: 0L) + 1
                         }
                     }
                     val totalMinutes = zoneMinutes.values.sum().coerceAtLeast(1L)
 
-                    val zoneSummaries = HrZone.values().map { zone ->
+                    val zoneSummaries = HrZone.entries.map { zone ->
                         val mins = zoneMinutes[zone] ?: 0L
                         HeartRateZoneSummary(zone, mins, mins.toFloat() / totalMinutes)
                     }
 
                     val allBpms = activities.flatMap { it.heartRateSamples }.map { it.bpm.toInt() }
 
-                    // Use dedicated RHR records if available; fall back to activity minimum
-                    val avgRhr = if (restingHrHistory.isNotEmpty())
-                        restingHrHistory.map { it.second }.average().toInt()
-                    else if (allBpms.isNotEmpty()) allBpms.min() else 0
-
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        avgRestingHr = avgRhr,
+                        avgRestingHr = if (avgRhrFromHistory > 0) avgRhrFromHistory
+                            else if (allBpms.isNotEmpty()) allBpms.min() else 0,
                         maxRecordedHr = if (allBpms.isNotEmpty()) allBpms.max() else 0,
                         zoneSummaries = zoneSummaries,
                         restingHrHistory = restingHrHistory
