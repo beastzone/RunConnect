@@ -3,6 +3,7 @@ package com.runconnect.app.data.db.entities
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.runconnect.app.domain.model.LapData
 
 @Entity(
     tableName = "activities",
@@ -21,7 +22,7 @@ data class ActivityEntity(
     val maxHeartRate: Int?,
     val averageSpeedMps: Double?,
     val calories: Int?,
-    val lapsJson: String,               // JSON-encoded List<LapData>
+    val laps: List<LapData>,            // TypeConverted to/from JSON by Converters.kt
     val dataOriginPackage: String,
     val garminActivityId: Long?,
     val completenessScore: Int,
