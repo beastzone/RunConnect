@@ -92,7 +92,7 @@ fun DashboardScreen(
                     .padding(horizontal = 20.dp, vertical = 16.dp)
             ) {
                 Text(
-                    text = "RunConnect",
+                    text = "Piki",
                     style = MaterialTheme.typography.headlineSmall.copy(
                         fontWeight = FontWeight.Bold,
                         color = TealPrimary,

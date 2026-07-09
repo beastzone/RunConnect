@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">RunConnect</string>
+    <string name="app_name">Piki</string>
     <string name="dashboard">Dashboard</string>
     <string name="activities">Activities</string>
     <string name="sleep">Sleep</string>
@@ -13,7 +13,7 @@
     <string name="connect_health_connect">Connect Health Connect</string>
     <string name="connect_garmin">Connect Garmin</string>
     <string name="health_connect_not_available">Health Connect is not available on this device</string>
-    <string name="permission_rationale">RunConnect needs access to your health data to show your activities and analytics.</string>
+    <string name="permission_rationale">Piki needs access to your health data to show your activities and analytics.</string>
     <string name="grant_permissions">Grant Permissions</string>
     <string name="no_activities">No activities found</string>
     <string name="loading">Loading…</string>

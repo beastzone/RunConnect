@@ -1,4 +1,4 @@
-# RunConnect
+# Piki
 
 A personal Android fitness analytics app that pulls data from Garmin Connect and Withings via Health Connect, with a dark UI inspired by Withings HealthMate.
 
