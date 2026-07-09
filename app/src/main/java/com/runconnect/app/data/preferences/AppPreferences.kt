@@ -30,6 +30,13 @@ class AppPreferences @Inject constructor(
         private val KEY_SLEEP_NEED_OVERRIDE = longPreferencesKey("sleep_need_override")
         private val KEY_SLEEP_ANNOTATIONS_JSON = stringPreferencesKey("sleep_annotations_json")
         private val KEY_SLEEP_TARGET_MINUTES = intPreferencesKey("sleep_target_minutes")
+        // Version tracking — appended in v1.1.0, never overwrite on upgrade
+        private val KEY_FIRST_INSTALL_VERSION = intPreferencesKey("app_first_install_version_code")
+        private val KEY_LAST_LAUNCHED_VERSION = intPreferencesKey("app_last_launched_version_code")
+        private val KEY_SETTINGS_SCHEMA = intPreferencesKey("app_settings_schema_version")
+        private val KEY_ONBOARDING_COMPLETE = booleanPreferencesKey("onboarding_complete")
+        // Persistent UI state
+        private val KEY_SLEEP_CHART_RANGE = stringPreferencesKey("sleep_chart_range")
     }
 
     val useImperial: Flow<Boolean> = dataStore.data.map { it[KEY_USE_IMPERIAL] ?: false }
@@ -63,4 +70,16 @@ class AppPreferences @Inject constructor(
     suspend fun setSleepNeedOverride(minutes: Long) { dataStore.edit { it[KEY_SLEEP_NEED_OVERRIDE] = minutes } }
     suspend fun setSleepAnnotationsJson(json: String) { dataStore.edit { it[KEY_SLEEP_ANNOTATIONS_JSON] = json } }
     suspend fun setSleepTargetMinutes(minutes: Int) { dataStore.edit { it[KEY_SLEEP_TARGET_MINUTES] = minutes } }
+
+    val firstInstallVersionCode: Flow<Int> = dataStore.data.map { it[KEY_FIRST_INSTALL_VERSION] ?: 0 }
+    val lastLaunchedVersionCode: Flow<Int> = dataStore.data.map { it[KEY_LAST_LAUNCHED_VERSION] ?: 0 }
+    val settingsSchemaVersion: Flow<Int> = dataStore.data.map { it[KEY_SETTINGS_SCHEMA] ?: 0 }
+    val onboardingComplete: Flow<Boolean> = dataStore.data.map { it[KEY_ONBOARDING_COMPLETE] ?: false }
+    val sleepChartRange: Flow<String> = dataStore.data.map { it[KEY_SLEEP_CHART_RANGE] ?: "SEVEN_DAYS" }
+
+    suspend fun setFirstInstallVersionCode(v: Int) { dataStore.edit { it[KEY_FIRST_INSTALL_VERSION] = v } }
+    suspend fun setLastLaunchedVersionCode(v: Int) { dataStore.edit { it[KEY_LAST_LAUNCHED_VERSION] = v } }
+    suspend fun setSettingsSchemaVersion(v: Int) { dataStore.edit { it[KEY_SETTINGS_SCHEMA] = v } }
+    suspend fun setOnboardingComplete(done: Boolean) { dataStore.edit { it[KEY_ONBOARDING_COMPLETE] = done } }
+    suspend fun setSleepChartRange(range: String) { dataStore.edit { it[KEY_SLEEP_CHART_RANGE] = range } }
 }
