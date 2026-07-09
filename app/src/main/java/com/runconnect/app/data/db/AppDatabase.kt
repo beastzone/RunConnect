@@ -24,7 +24,7 @@ import com.runconnect.app.data.db.entities.SyncStateEntity
         SleepStageEntity::class,
         SyncStateEntity::class,
     ],
-    version = AppDatabase.VERSION,
+    version = 1,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)

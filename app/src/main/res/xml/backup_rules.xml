@@ -6,7 +6,5 @@
 -->
 <full-backup-content>
     <include domain="file" path="datastore/runconnect_prefs.preferences_pb"/>
-    <exclude domain="file" path="databases/runconnect_db"/>
-    <exclude domain="file" path="databases/runconnect_db-shm"/>
-    <exclude domain="file" path="databases/runconnect_db-wal"/>
+    <exclude domain="database" path="runconnect_db"/>
 </full-backup-content>
