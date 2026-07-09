@@ -32,7 +32,7 @@ Download the latest APK from the [Releases](https://github.com/beastzone/RunConn
   - **Elevation profile chart** — with X/Y axis labels and touch scrubbing (altitude + distance tooltip)
   - **Pace chart** — with X/Y axis labels and touch scrubbing (pace tooltip)
   - **Heart rate chart** — zone-band background (Z1–Z5), avg-HR dashed reference line, peak-HR marker, lap boundary lines with labels, artifact highlighting; touch scrubbing shows "152 bpm · Z3" tooltip
-  - **HR analysis cards** — Heart Rate Zones (time + % per zone), HR Drift (1st vs 2nd half avg, drift %, possible causes), Aerobic Decoupling (Pa:Hr % with well-coupled/decoupled badge, historical comparison), HR Recovery (1/2/5 min drop post-activity); artifact warning banner when sensor anomalies detected
+  - **HR analysis cards** — Heart Rate Zones (time + % per zone), HR Drift (1st vs 2nd half avg, drift %, possible causes), Aerobic Decoupling (Pa:Hr % with well-coupled/decoupled badge, historical comparison), HR Recovery (1/2/5 min drop post-activity), HR vs Pace scatter (terrain filter: All/Flat/Uphill/Downhill), HR vs Elevation scatter, HR Efficiency (cm/beat); power placeholder for cycling; artifact warning banner when sensor anomalies detected
   - Lap splits table
   - **Race predictions** via the Riegel formula (`T2 = T1 × (D2/D1)^1.06`) for 1 mi, 5K, 10K, half marathon, and full marathon
 

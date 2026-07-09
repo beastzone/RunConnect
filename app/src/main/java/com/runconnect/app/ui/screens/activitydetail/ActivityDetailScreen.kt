@@ -46,8 +46,12 @@ import com.runconnect.app.domain.model.averagePaceSecondsPerKm
 import com.runconnect.app.domain.model.averagePaceSecondsPerMile
 import com.runconnect.app.domain.model.distanceKm
 import com.runconnect.app.domain.model.distanceMiles
+import androidx.compose.foundation.clickable
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import com.runconnect.app.ui.components.ActivityHrChart
 import com.runconnect.app.ui.components.ElevationChart
+import com.runconnect.app.ui.components.HrScatterChart
 import com.runconnect.app.ui.components.HrZoneBar
 import com.runconnect.app.ui.components.PaceChart
 import com.runconnect.app.ui.components.SectionHeader
@@ -94,6 +98,7 @@ fun ActivityDetailScreen(
                     activity = state.activity!!,
                     state = state,
                     onBack = onBack,
+                    onTerrainFilter = viewModel::setTerrainFilter,
                 )
             }
         }
@@ -105,6 +110,7 @@ private fun ActivityDetailContent(
     activity: Activity,
     state: ActivityDetailUiState,
     onBack: () -> Unit,
+    onTerrainFilter: (TerrainFilter) -> Unit = {},
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -325,6 +331,91 @@ private fun ActivityDetailContent(
                     recovery = state.hrRecovery,
                     modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp),
                 )
+            }
+        }
+
+        // HR vs Pace scatter
+        if (state.hrVsPacePoints.size >= 10) {
+            item {
+                HrVsPaceCard(
+                    points = state.hrVsPacePoints,
+                    terrainFilter = state.terrainFilter,
+                    onFilter = onTerrainFilter,
+                    modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp),
+                )
+            }
+        }
+
+        // HR vs Elevation scatter (requires route with altitude)
+        if (state.hrVsElevationPoints.size >= 10) {
+            item {
+                Column(
+                    modifier = Modifier
+                        .padding(horizontal = 20.dp)
+                        .padding(bottom = 16.dp)
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(CardDark)
+                        .padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Text(
+                        "HR vs Elevation",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = TextPrimary,
+                    )
+                    HrScatterChart(
+                        points = state.hrVsElevationPoints,
+                        xLabel = "Elevation (m)",
+                        yLabel = "BPM",
+                    )
+                }
+            }
+        }
+
+        // HR Efficiency
+        if (state.hrEfficiency != null) {
+            item {
+                HrEfficiencyCard(
+                    efficiencyMPerBeat = state.hrEfficiency,
+                    modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp),
+                )
+            }
+        }
+
+        // 8.8 Power placeholder for cycling
+        if (activity.type == ActivityType.CYCLING) {
+            item {
+                Row(
+                    modifier = Modifier
+                        .padding(horizontal = 20.dp)
+                        .padding(bottom = 16.dp)
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(CardDark)
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        Icons.Filled.Speed,
+                        contentDescription = null,
+                        tint = TextSecondary,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Column {
+                        Text(
+                            "HR vs Power",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                            color = TextSecondary,
+                        )
+                        Text(
+                            "Power data coming soon",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary.copy(alpha = 0.6f),
+                        )
+                    }
+                }
             }
         }
 
@@ -574,5 +665,94 @@ private fun HrRecoveryCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun HrVsPaceCard(
+    points: List<Pair<Float, Float>>,
+    terrainFilter: TerrainFilter,
+    onFilter: (TerrainFilter) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(CardDark)
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(
+            "HR vs Pace",
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = TextPrimary,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TerrainFilter.entries.forEach { filter ->
+                val label = when (filter) {
+                    TerrainFilter.ALL -> "All"
+                    TerrainFilter.FLAT -> "Flat"
+                    TerrainFilter.UPHILL -> "Uphill"
+                    TerrainFilter.DOWNHILL -> "Downhill"
+                }
+                FilterChip(
+                    selected = terrainFilter == filter,
+                    onClick = { onFilter(filter) },
+                    label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = TealPrimary.copy(alpha = 0.2f),
+                        selectedLabelColor = TealPrimary,
+                    ),
+                )
+            }
+        }
+        if (points.isNotEmpty()) {
+            HrScatterChart(
+                points = points,
+                xLabel = "Pace (s/km)",
+                yLabel = "BPM",
+            )
+        } else {
+            Text(
+                "No data for this terrain filter. Route data needed for terrain classification.",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary,
+            )
+        }
+    }
+}
+
+@Composable
+private fun HrEfficiencyCard(
+    efficiencyMPerBeat: Double,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(CardDark)
+            .padding(horizontal = 20.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Column {
+            Text(
+                "HR Efficiency",
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                color = TextPrimary,
+            )
+            Text(
+                "Higher = more speed per heartbeat",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary,
+            )
+        }
+        Text(
+            "${"%.2f".format(efficiencyMPerBeat * 100)} cm/beat",
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+            color = TealPrimary,
+        )
     }
 }
