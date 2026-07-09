@@ -77,6 +77,7 @@ Download the latest APK from the [Releases](https://github.com/beastzone/RunConn
 - **Per-session detail screen** — tap any night to open a full-detail view with all of the above, navigable with the back button
 
 ### Heart Rate
+- **Continuous HR from wearables** — second-by-second HR samples from Garmin Connect, Samsung Health, and Withings (all via Health Connect) now flow into all analytics; Garmin's day-spanning `HeartRateRecord` is filtered at sample level so per-activity samples are correctly extracted
 - **Current HR tile** — latest intraday HR sample from today (12.2)
 - HR zone distribution (Zone 1–5 based on % of max HR or Heart Rate Reserve)
 - **Enhanced resting HR stats** — 7-day average, 30-day baseline, delta from baseline with color coding (12.3)

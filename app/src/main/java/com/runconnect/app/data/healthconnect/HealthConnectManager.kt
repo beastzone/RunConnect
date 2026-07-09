@@ -153,8 +153,11 @@ class HealthConnectManager @Inject constructor(
             val sEnd = session.endTime
 
             val heartRateSamples = allHr
-                .filter { it.startTime >= sStart && it.endTime <= sEnd }
-                .flatMap { r -> r.samples.map { HeartRateSample(it.time, it.beatsPerMinute) } }
+                .flatMap { r ->
+                    r.samples
+                        .filter { it.time >= sStart && it.time <= sEnd.plusSeconds(300) }
+                        .map { HeartRateSample(it.time, it.beatsPerMinute) }
+                }
 
             val speedSamples = allSpeed
                 .filter { it.startTime >= sStart && it.endTime <= sEnd }

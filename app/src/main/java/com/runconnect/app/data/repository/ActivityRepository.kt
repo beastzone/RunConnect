@@ -86,7 +86,13 @@ class ActivityRepository @Inject constructor(
                     now.epochSecond - it < CACHE_TTL_SECONDS
                 } ?: false
                 if (roomFresh) {
-                    val domain = roomActivities.map { it.toDomain() }
+                    val samplesByActivity = activityHrSampleDao
+                        .getForActivities(roomActivities.map { it.id })
+                        .groupBy { it.activityId }
+                        .mapValues { (_, entities) -> entities.map { it.toDomain() } }
+                    val domain = roomActivities.map { entity ->
+                        entity.toDomain(hrSamples = samplesByActivity[entity.id] ?: emptyList())
+                    }
                     cache.clear()
                     cache.addAll(domain)
                     cacheTime = now
@@ -123,7 +129,13 @@ class ActivityRepository @Inject constructor(
             // Room fallback — return persisted data when HC is unreachable
             val roomActivities = activityDao.getActivitiesSince(startEpoch)
             if (roomActivities.isNotEmpty()) {
-                val domain = roomActivities.map { it.toDomain() }
+                val samplesByActivity = activityHrSampleDao
+                    .getForActivities(roomActivities.map { it.id })
+                    .groupBy { it.activityId }
+                    .mapValues { (_, entities) -> entities.map { it.toDomain() } }
+                val domain = roomActivities.map { entity ->
+                    entity.toDomain(hrSamples = samplesByActivity[entity.id] ?: emptyList())
+                }
                 cache.clear()
                 cache.addAll(domain)
                 cacheTime = now
