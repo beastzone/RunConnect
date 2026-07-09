@@ -1,5 +1,6 @@
 package com.runconnect.app.ui.screens.sleep
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -22,15 +23,24 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,6 +48,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.runconnect.app.domain.model.BedtimeStats
 import com.runconnect.app.domain.model.MonthlySleepReport
@@ -46,6 +57,7 @@ import com.runconnect.app.domain.model.SleepCorrelation
 import com.runconnect.app.domain.model.SleepDebtInfo
 import com.runconnect.app.domain.model.SleepPrediction
 import com.runconnect.app.domain.model.SleepRecommendation
+import com.runconnect.app.domain.model.SleepScoreResult
 import com.runconnect.app.domain.model.SleepSession
 import com.runconnect.app.domain.model.SleepStageType
 import com.runconnect.app.domain.model.WakeTimeStats
@@ -66,6 +78,7 @@ import com.runconnect.app.ui.theme.TealPrimary
 import com.runconnect.app.ui.theme.TextPrimary
 import com.runconnect.app.ui.theme.TextSecondary
 import com.runconnect.app.utils.FormatUtils
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
@@ -144,10 +157,103 @@ fun SleepScreen(
 
         LazyColumn(contentPadding = PaddingValues(bottom = 32.dp)) {
 
-            // Last Night Overview
-            val lastNight = state.mainSessions.firstOrNull()
-            if (lastNight != null) {
-                item { LastNightOverviewCard(lastNight) }
+            // Date navigation header
+            item(key = "date_nav") {
+                val hasPrev = state.availableDates.any { it < state.selectedDate }
+                val hasNext = state.availableDates.any { it > state.selectedDate }
+                DateNavHeader(
+                    selectedDate = state.selectedDate,
+                    hasPrev = hasPrev,
+                    hasNext = hasNext,
+                    onPrev = { viewModel.navigatePrev() },
+                    onNext = { viewModel.navigateNext() },
+                    modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 8.dp).fillMaxWidth(),
+                )
+            }
+
+            // Score hero
+            state.selectedSession?.let { session ->
+                item(key = "hero") {
+                    SleepScoreHeroCard(
+                        session = session,
+                        scoreResult = state.selectedScoreResult,
+                        modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp).fillMaxWidth(),
+                    )
+                }
+            }
+
+            // Rolling score chart
+            if (state.rollingScores.isNotEmpty()) {
+                item(key = "chart") {
+                    SleepScoreChart(
+                        scores = state.rollingScores,
+                        selectedDate = state.selectedDate,
+                        range = state.chartRange,
+                        onDateSelected = { viewModel.navigateToDate(it) },
+                        onRangeSelected = { viewModel.setChartRange(it) },
+                        modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp),
+                    )
+                }
+            }
+
+            // Hypnogram
+            state.selectedSession?.let { session ->
+                if (session.stages.isNotEmpty()) {
+                    item(key = "hypnogram") {
+                        Box(
+                            modifier = Modifier
+                                .padding(horizontal = 20.dp)
+                                .padding(bottom = 16.dp)
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(CardDark)
+                                .padding(12.dp)
+                        ) {
+                            Column {
+                                Text(
+                                    "Sleep Stages",
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                                    color = TextPrimary,
+                                    modifier = Modifier.padding(bottom = 8.dp),
+                                )
+                                SleepHypnogram(session = session)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Metrics grid
+            state.selectedSession?.let { session ->
+                item(key = "metrics") {
+                    MetricsSummarySection(
+                        session = session,
+                        modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp).fillMaxWidth(),
+                    )
+                }
+            }
+
+            // No data for selected date
+            if (state.selectedSession == null && !state.isLoading) {
+                item(key = "empty_date") {
+                    Box(
+                        Modifier
+                            .padding(horizontal = 20.dp)
+                            .padding(bottom = 16.dp)
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(CardDark)
+                            .padding(20.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            "No sleep data for ${state.selectedDate.format(DateTimeFormatter.ofPattern("EEE, MMM d"))}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                }
             }
 
             // Debt + Prediction
@@ -256,12 +362,205 @@ fun SleepScreen(
             items(state.mainSessions.take(30), key = { it.id }) { session ->
                 SleepSessionCard(
                     session = session,
-                    onClick = { onSessionClick(session.id) },
+                    onClick = {
+                        viewModel.selectSessionById(session.id)
+                        onSessionClick(session.id)
+                    },
                     modifier = Modifier
                         .padding(horizontal = 20.dp)
                         .padding(bottom = 10.dp)
                         .fillMaxWidth(),
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DateNavHeader(
+    selectedDate: LocalDate,
+    hasPrev: Boolean,
+    hasNext: Boolean,
+    onPrev: () -> Unit,
+    onNext: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val dateFmt = DateTimeFormatter.ofPattern("EEE, MMM d")
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClick = onPrev, enabled = hasPrev) {
+            Icon(
+                Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Previous night",
+                tint = if (hasPrev) TextPrimary else TextSecondary.copy(alpha = 0.3f),
+            )
+        }
+        Text(
+            selectedDate.format(dateFmt),
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+            color = TextPrimary,
+        )
+        IconButton(onClick = onNext, enabled = hasNext) {
+            Icon(
+                Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = "Next night",
+                tint = if (hasNext) TextPrimary else TextSecondary.copy(alpha = 0.3f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SleepScoreHeroCard(
+    session: SleepSession,
+    scoreResult: SleepScoreResult?,
+    modifier: Modifier = Modifier,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val score = scoreResult?.score ?: session.sleepScore
+    val rating = scoreResult?.rating ?: when {
+        score >= 90 -> "Excellent"
+        score >= 80 -> "Good"
+        score >= 70 -> "Fair"
+        score >= 60 -> "Low"
+        else -> "Poor"
+    }
+    val scoreColor = when {
+        score >= 90 -> TealPrimary
+        score >= 80 -> Color(0xFF4ADE80)
+        score >= 70 -> Color(0xFFFBBF24)
+        score >= 60 -> AmberAccent
+        else -> CoralAccent
+    }
+    val zoneId = ZoneId.systemDefault()
+    val nightFmt = DateTimeFormatter.ofPattern("EEE, MMM d")
+    val nightLabel = session.startTime.atZone(zoneId).toLocalDate().format(nightFmt)
+
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(CardDark)
+            .clickable { expanded = !expanded }
+            .padding(20.dp)
+            .animateContentSize()
+    ) {
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column {
+                    Text(
+                        "$score",
+                        style = MaterialTheme.typography.displayMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 64.sp,
+                        ),
+                        color = scoreColor,
+                    )
+                    Text(
+                        rating,
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                        color = scoreColor,
+                    )
+                    Text(
+                        "Night of $nightLabel",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary,
+                    )
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        scoreResult?.confidence?.name?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextSecondary,
+                    )
+                    Text(
+                        "Tap to expand",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextSecondary.copy(alpha = 0.6f),
+                    )
+                }
+            }
+
+            if (expanded && scoreResult != null) {
+                Spacer(Modifier.height(16.dp))
+                HorizontalDivider(color = DividerColor, thickness = 0.5.dp)
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "Score Components",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextSecondary,
+                )
+                Spacer(Modifier.height(8.dp))
+
+                data class Component(val name: String, val score: Int?, val weight: Double)
+                listOf(
+                    Component("Duration", scoreResult.durationScore, scoreResult.durationWeight),
+                    Component("Efficiency", scoreResult.efficiencyScore, scoreResult.efficiencyWeight),
+                    Component("Continuity", scoreResult.continuityScore, scoreResult.continuityWeight),
+                    Component("Consistency", scoreResult.consistencyScore, scoreResult.consistencyWeight),
+                    Component("Stages", scoreResult.stageScore, scoreResult.stageWeight),
+                    Component("Recovery", scoreResult.recoveryScore, scoreResult.recoveryWeight),
+                ).forEach { comp ->
+                    if (comp.weight > 0) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                comp.name,
+                                modifier = Modifier.width(80.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextPrimary,
+                            )
+                            LinearProgressIndicator(
+                                progress = { (comp.score ?: 0) / 100f },
+                                modifier = Modifier.weight(1f).height(4.dp).clip(RoundedCornerShape(2.dp)),
+                                color = scoreColor,
+                                trackColor = DividerColor,
+                            )
+                            Text(
+                                comp.score?.toString() ?: "–",
+                                modifier = Modifier.width(28.dp),
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                                color = TextPrimary,
+                                textAlign = TextAlign.End,
+                            )
+                            Text(
+                                "${(comp.weight * 100).toInt()}%",
+                                modifier = Modifier.width(32.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextSecondary,
+                                textAlign = TextAlign.End,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MetricsSummarySection(session: SleepSession, modifier: Modifier = Modifier) {
+    Box(modifier = modifier.clip(RoundedCornerShape(16.dp)).background(CardDark).padding(8.dp)) {
+        Column {
+            Row(modifier = Modifier.fillMaxWidth()) {
+                SleepMetricCard("Total Sleep", FormatUtils.formatSleepDuration(session.totalSleepMinutes), TealPrimary, Modifier.weight(1f))
+                SleepMetricCard("Deep", FormatUtils.formatSleepDuration(session.deepSleepMinutes), SleepDeep, Modifier.weight(1f))
+                SleepMetricCard("REM", FormatUtils.formatSleepDuration(session.remSleepMinutes), SleepRem, Modifier.weight(1f))
+                SleepMetricCard("Efficiency", "${session.sleepEfficiencyPercent}%", TealPrimary, Modifier.weight(1f))
+            }
+            Row(modifier = Modifier.fillMaxWidth()) {
+                SleepMetricCard("Awake", FormatUtils.formatSleepDuration(session.awakeMinutes), SleepAwake, Modifier.weight(1f))
+                SleepMetricCard("WASO", "${session.wasoMinutes}m", AmberAccent, Modifier.weight(1f))
+                SleepMetricCard("Latency", "${session.sleepLatencyMinutes}m", TextSecondary, Modifier.weight(1f))
+                SleepMetricCard("Awakenings", "${session.awakeningCount}", TextSecondary, Modifier.weight(1f))
             }
         }
     }
@@ -665,6 +964,8 @@ internal fun SleepStageBar(session: SleepSession, height: androidx.compose.ui.un
                 SleepStageType.LIGHT -> SleepLight
                 SleepStageType.REM -> SleepRem
                 SleepStageType.AWAKE -> SleepAwake
+                SleepStageType.SLEEPING_UNSPECIFIED -> SleepLight
+                SleepStageType.OUT_OF_BED -> SleepAwake
                 SleepStageType.UNKNOWN -> Color(0xFF2A3242)
             }
             drawRect(

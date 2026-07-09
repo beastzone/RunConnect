@@ -38,11 +38,24 @@ Download the latest APK from the [Releases](https://github.com/beastzone/RunConn
 ### Sleep Analytics
 - 90-day sleep sessions pulled from Health Connect — supports both Garmin Connect and Withings simultaneously
 - **Source toggle** — flip between Garmin / Withings / Combined view; all analytics recalculate per source
-- **Sleep overview card** — last-night total sleep, time in bed, efficiency, latency, WASO, awakenings, bedtime–wake window, sleep midpoint, and sleep score (0–100)
-- **Sleep score** — weighted composite: efficiency 40%, deep sleep % 30%, REM % 20%, optimal latency bonus 10%
-- **Interactive stage timeline** — Canvas-rendered color bands (Deep/Light/REM/Awake) with touch scrubbing; HR line overlay when data available
+- **Correct stage mapping** — Health Connect integer constants properly decoded: 1=Awake, 2=Sleeping (unspecified), 3=Out of Bed, 4=Light, 5=Deep, 6=REM; Garmin single-stage `SLEEPING_UNSPECIFIED` sessions count toward total sleep
+- **Source-aware HR/HRV/SpO2** — biometric samples matched to the session's originating device first; cross-device fallback only when same-source data is absent
+- **Date navigation** — browse any night with ← / → arrows; chart highlights selected night automatically
+- **6-component sleep score** — transparent weighted composite (0–100) with dynamic weight redistribution when components are unavailable:
+  - Duration (35% nominal) — how close to your target sleep time
+  - Efficiency (25%) — time asleep / time in bed, full credit at ≥ 90%
+  - Continuity (15%, requires ≥ 40% stage coverage) — penalizes WASO, long latency, and frequent awakenings
+  - Consistency (10%, requires ≥ 7-night history) — standard deviation of bedtimes; 120 min variation = 0 points
+  - Stages (10%, requires ≥ 80% stage coverage) — deep + REM % vs 20% target each
+  - Recovery (5%, requires ≥ 5 HR samples) — nightly HR vs your baseline; lower = better
+- **Score hero card** — large score + rating (Excellent / Good / Fair / Low / Poor) with tap-to-expand component breakdown showing per-component score, progress bar, and effective weight
+- **Rolling score chart** — Canvas bar chart with 7D / 14D / 30D / 3M / 6M / 1Y range selector; score-zone color bands; touch scrubbing shows date and score
+- **Hypnogram** — vertical-depth stage lanes (Awake → REM → Light → Deep) with proportional time axis and touch scrubbing showing stage name, time range, duration, and avg HR
+- **Metrics grid** — 8-cell summary card: Total Sleep, Deep, REM, Efficiency (row 1); Awake (includes Out-of-Bed), WASO, Latency, Awakenings (row 2)
+- **Sleep overview card** — last-night total sleep, time in bed, efficiency, latency, WASO, awakenings, bedtime–wake window, sleep midpoint
+- **Interactive stage timeline** — Canvas-rendered color bands (Deep/Light/REM/Awake/Unspecified) with touch scrubbing; HR line overlay when data available
 - **Stage detail table** — per-stage duration, %, episode count, longest episode, and delta vs your historical averages
-- **Efficiency, latency, WASO, and midpoint** — computed from stage boundary data; latency supports a manual correction offset
+- **Efficiency, latency, WASO, and midpoint** — computed from stage boundary data; latency supports a manual correction offset; Awake and WASO include Out-of-Bed stages
 - **Bedtime consistency** — avg, earliest, latest, std-dev; weekday vs weekend split; social jet-lag indicator
 - **Wake-time consistency** — same breakdown as bedtime
 - **Sleep debt** — last-night deficit and 7-day cumulative debt vs your personal sleep need

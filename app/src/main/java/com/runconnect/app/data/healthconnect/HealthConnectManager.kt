@@ -315,15 +315,38 @@ class HealthConnectManager @Inject constructor(
         }.getOrDefault(emptyList())
 
         return baseSessions.map { session ->
+            // Tier 1: same source package. Tier 2: any source within the time window (fallback).
+            val sameSourceHr = hrRecords
+                .filter { r -> r.metadata.dataOrigin.packageName == session.dataOriginPackage }
+                .flatMap { r -> r.samples.filter { it.time >= session.startTime && it.time <= session.endTime }
+                    .map { it.time to it.beatsPerMinute.toInt() } }
+            val heartRateSamples = if (sameSourceHr.isNotEmpty()) sameSourceHr else {
+                hrRecords.flatMap { r -> r.samples.filter { it.time >= session.startTime && it.time <= session.endTime }
+                    .map { it.time to it.beatsPerMinute.toInt() } }
+            }
+
+            val sameSourceHrv = hrvRecords
+                .filter { r -> r.metadata.dataOrigin.packageName == session.dataOriginPackage }
+                .filter { it.time >= session.startTime && it.time <= session.endTime }
+                .map { it.time to it.heartRateVariabilityMillis }
+            val hrvSamples = if (sameSourceHrv.isNotEmpty()) sameSourceHrv else {
+                hrvRecords.filter { it.time >= session.startTime && it.time <= session.endTime }
+                    .map { it.time to it.heartRateVariabilityMillis }
+            }
+
+            val sameSourceSpo2 = spo2Records
+                .filter { r -> r.metadata.dataOrigin.packageName == session.dataOriginPackage }
+                .filter { it.time >= session.startTime && it.time <= session.endTime }
+                .map { it.time to it.percentage.value }
+            val spo2Samples = if (sameSourceSpo2.isNotEmpty()) sameSourceSpo2 else {
+                spo2Records.filter { it.time >= session.startTime && it.time <= session.endTime }
+                    .map { it.time to it.percentage.value }
+            }
+
             session.copy(
-                heartRateSamples = hrRecords.flatMap { r ->
-                    r.samples.filter { it.time >= session.startTime && it.time <= session.endTime }
-                        .map { it.time to it.beatsPerMinute.toInt() }
-                },
-                hrvSamples = hrvRecords.filter { it.time >= session.startTime && it.time <= session.endTime }
-                    .map { it.time to it.heartRateVariabilityMillis },
-                spo2Samples = spo2Records.filter { it.time >= session.startTime && it.time <= session.endTime }
-                    .map { it.time to it.percentage.value },
+                heartRateSamples = heartRateSamples,
+                hrvSamples = hrvSamples,
+                spo2Samples = spo2Samples,
             )
         }
     }

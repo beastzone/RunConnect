@@ -29,6 +29,7 @@ class AppPreferences @Inject constructor(
         private val KEY_SLEEP_SOURCE_FILTER = stringPreferencesKey("sleep_source_filter")
         private val KEY_SLEEP_NEED_OVERRIDE = longPreferencesKey("sleep_need_override")
         private val KEY_SLEEP_ANNOTATIONS_JSON = stringPreferencesKey("sleep_annotations_json")
+        private val KEY_SLEEP_TARGET_MINUTES = intPreferencesKey("sleep_target_minutes")
     }
 
     val useImperial: Flow<Boolean> = dataStore.data.map { it[KEY_USE_IMPERIAL] ?: false }
@@ -43,6 +44,7 @@ class AppPreferences @Inject constructor(
     val sleepSourceFilter: Flow<String?> = dataStore.data.map { it[KEY_SLEEP_SOURCE_FILTER] }
     val sleepNeedOverride: Flow<Long> = dataStore.data.map { it[KEY_SLEEP_NEED_OVERRIDE] ?: 0L }
     val sleepAnnotationsJson: Flow<String> = dataStore.data.map { it[KEY_SLEEP_ANNOTATIONS_JSON] ?: "{}" }
+    val sleepTargetMinutes: Flow<Int> = dataStore.data.map { it[KEY_SLEEP_TARGET_MINUTES] ?: 480 }
 
     suspend fun setUseImperial(value: Boolean) { dataStore.edit { it[KEY_USE_IMPERIAL] = value } }
     suspend fun setMapboxToken(token: String) { dataStore.edit { it[KEY_MAPBOX_TOKEN] = token } }
@@ -60,4 +62,5 @@ class AppPreferences @Inject constructor(
     }
     suspend fun setSleepNeedOverride(minutes: Long) { dataStore.edit { it[KEY_SLEEP_NEED_OVERRIDE] = minutes } }
     suspend fun setSleepAnnotationsJson(json: String) { dataStore.edit { it[KEY_SLEEP_ANNOTATIONS_JSON] = json } }
+    suspend fun setSleepTargetMinutes(minutes: Int) { dataStore.edit { it[KEY_SLEEP_TARGET_MINUTES] = minutes } }
 }

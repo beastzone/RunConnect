@@ -102,6 +102,8 @@ fun SleepStageTimeline(session: SleepSession, modifier: Modifier = Modifier) {
                 SleepStageType.LIGHT -> SleepLight
                 SleepStageType.REM -> SleepRem
                 SleepStageType.AWAKE -> SleepAwake
+                SleepStageType.SLEEPING_UNSPECIFIED -> SleepLight
+                SleepStageType.OUT_OF_BED -> SleepAwake
                 SleepStageType.UNKNOWN -> Color(0xFF2A3242)
             }
             drawRect(color = color, topLeft = Offset(x0, 0f), size = androidx.compose.ui.geometry.Size(x1 - x0, stageH))
@@ -276,14 +278,14 @@ fun StageDetailSection(
         "Deep" to session.stages.count { it.type == SleepStageType.DEEP },
         "Light" to session.stages.count { it.type == SleepStageType.LIGHT },
         "REM" to session.stages.count { it.type == SleepStageType.REM },
-        "Awake" to session.stages.count { it.type == SleepStageType.AWAKE },
+        "Awake" to session.stages.count { it.type == SleepStageType.AWAKE || it.type == SleepStageType.OUT_OF_BED },
     )
 
     val longestEpisodes = mapOf(
         "Deep" to (session.stages.filter { it.type == SleepStageType.DEEP }.maxOfOrNull { (it.endTime.epochSecond - it.startTime.epochSecond) / 60 } ?: 0L),
         "Light" to (session.stages.filter { it.type == SleepStageType.LIGHT }.maxOfOrNull { (it.endTime.epochSecond - it.startTime.epochSecond) / 60 } ?: 0L),
         "REM" to (session.stages.filter { it.type == SleepStageType.REM }.maxOfOrNull { (it.endTime.epochSecond - it.startTime.epochSecond) / 60 } ?: 0L),
-        "Awake" to (session.stages.filter { it.type == SleepStageType.AWAKE }.maxOfOrNull { (it.endTime.epochSecond - it.startTime.epochSecond) / 60 } ?: 0L),
+        "Awake" to (session.stages.filter { it.type == SleepStageType.AWAKE || it.type == SleepStageType.OUT_OF_BED }.maxOfOrNull { (it.endTime.epochSecond - it.startTime.epochSecond) / 60 } ?: 0L),
     )
 
     Column(modifier = modifier) {
@@ -466,5 +468,30 @@ fun SleepEnvironmentNotesForm(
                 colors = SwitchDefaults.colors(checkedThumbColor = TealPrimary, checkedTrackColor = TealPrimary.copy(alpha = 0.4f)),
             )
         }
+    }
+}
+
+@Composable
+fun SleepMetricCard(
+    label: String,
+    value: String,
+    accent: Color = TealPrimary,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.padding(8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            value,
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+            color = accent,
+        )
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = TextSecondary,
+            textAlign = TextAlign.Center,
+        )
     }
 }

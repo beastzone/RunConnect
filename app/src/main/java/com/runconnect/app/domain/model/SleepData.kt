@@ -34,7 +34,7 @@ data class SleepSession(
             .sumOf { (it.endTime.epochSecond - it.startTime.epochSecond) / 60 }
 
     val awakeMinutes: Long
-        get() = stages.filter { it.type == SleepStageType.AWAKE }
+        get() = stages.filter { it.type == SleepStageType.AWAKE || it.type == SleepStageType.OUT_OF_BED }
             .sumOf { (it.endTime.epochSecond - it.startTime.epochSecond) / 60 }
 
     val sleepEfficiencyPercent: Int
@@ -45,11 +45,19 @@ data class SleepSession(
             else 0
         }
 
+    val unspecifiedSleepMinutes: Long
+        get() = stages.filter { it.type == SleepStageType.SLEEPING_UNSPECIFIED }
+            .sumOf { (it.endTime.epochSecond - it.startTime.epochSecond) / 60 }
+
     val totalSleepMinutes: Long
-        get() = deepSleepMinutes + lightSleepMinutes + remSleepMinutes
+        get() = deepSleepMinutes + lightSleepMinutes + remSleepMinutes + unspecifiedSleepMinutes
 
     val sleepOnset: Instant?
-        get() = stages.firstOrNull { it.type != SleepStageType.AWAKE && it.type != SleepStageType.UNKNOWN }?.startTime
+        get() = stages.firstOrNull {
+            it.type != SleepStageType.AWAKE &&
+            it.type != SleepStageType.OUT_OF_BED &&
+            it.type != SleepStageType.UNKNOWN
+        }?.startTime
 
     val sleepLatencyMinutes: Long
         get() = sleepOnset?.let { (it.epochSecond - startTime.epochSecond) / 60 } ?: 0L
@@ -57,14 +65,19 @@ data class SleepSession(
     val wasoMinutes: Long
         get() {
             val onset = sleepOnset ?: return 0L
-            return stages.filter { it.type == SleepStageType.AWAKE && it.startTime >= onset }
-                .sumOf { (it.endTime.epochSecond - it.startTime.epochSecond) / 60 }
+            return stages.filter {
+                (it.type == SleepStageType.AWAKE || it.type == SleepStageType.OUT_OF_BED) &&
+                it.startTime >= onset
+            }.sumOf { (it.endTime.epochSecond - it.startTime.epochSecond) / 60 }
         }
 
     val awakeningCount: Int
         get() {
             val onset = sleepOnset ?: return 0
-            return stages.count { it.type == SleepStageType.AWAKE && it.startTime >= onset }
+            return stages.count {
+                (it.type == SleepStageType.AWAKE || it.type == SleepStageType.OUT_OF_BED) &&
+                it.startTime >= onset
+            }
         }
 
     val midpointTime: Instant?
@@ -121,18 +134,41 @@ data class SleepStage(
 )
 
 enum class SleepStageType {
-    DEEP, LIGHT, REM, AWAKE, UNKNOWN;
+    DEEP, LIGHT, REM, AWAKE, SLEEPING_UNSPECIFIED, OUT_OF_BED, UNKNOWN;
 
     companion object {
         fun fromHealthConnect(stage: Int): SleepStageType = when (stage) {
-            4 -> DEEP     // STAGE_TYPE_SLEEPING_DEEP
-            1 -> LIGHT    // STAGE_TYPE_SLEEPING_LIGHT
-            5 -> REM      // STAGE_TYPE_SLEEPING_REM
-            2 -> AWAKE    // STAGE_TYPE_AWAKE
+            1 -> AWAKE                // STAGE_TYPE_AWAKE
+            2 -> SLEEPING_UNSPECIFIED // STAGE_TYPE_SLEEPING (no sub-stage)
+            3 -> OUT_OF_BED          // STAGE_TYPE_OUT_OF_BED
+            4 -> LIGHT               // STAGE_TYPE_SLEEPING_LIGHT
+            5 -> DEEP                // STAGE_TYPE_SLEEPING_DEEP
+            6 -> REM                 // STAGE_TYPE_SLEEPING_REM
             else -> UNKNOWN
         }
     }
 }
+
+enum class SleepConfidence { HIGH, MEDIUM, LOW }
+
+data class SleepScoreResult(
+    val score: Int,
+    val rating: String,
+    val durationScore: Int?,
+    val durationWeight: Double,
+    val efficiencyScore: Int?,
+    val efficiencyWeight: Double,
+    val continuityScore: Int?,
+    val continuityWeight: Double,
+    val consistencyScore: Int?,
+    val consistencyWeight: Double,
+    val stageScore: Int?,
+    val stageWeight: Double,
+    val recoveryScore: Int?,
+    val recoveryWeight: Double,
+    val confidence: SleepConfidence,
+    val modelVersion: Int,
+)
 
 data class SleepAnnotation(
     val latencyCorrectionMinutes: Int = 0,
