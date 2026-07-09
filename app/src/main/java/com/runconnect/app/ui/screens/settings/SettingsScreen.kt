@@ -60,6 +60,9 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
+import com.runconnect.app.BuildConfig
+import com.runconnect.app.data.db.AppDatabase
+import com.runconnect.app.domain.scoring.SleepScoreWeights
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -334,6 +337,47 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                         Text("Disconnect Garmin")
                     }
                 }
+            }
+        }
+
+        // --- About ---
+        item {
+            SettingsSection("About") {
+                StatusRow(
+                    label = "Version",
+                    value = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                    valueColor = TextSecondary,
+                )
+                Spacer(Modifier.height(4.dp))
+                StatusRow(
+                    label = "Build",
+                    value = BuildConfig.BUILD_TYPE,
+                    valueColor = TextSecondary,
+                )
+                Spacer(Modifier.height(4.dp))
+                StatusRow(
+                    label = "Package",
+                    value = BuildConfig.APPLICATION_ID,
+                    valueColor = TextSecondary,
+                )
+                Spacer(Modifier.height(4.dp))
+                StatusRow(
+                    label = "Database Schema",
+                    value = "v${AppDatabase.VERSION}",
+                    valueColor = TextSecondary,
+                )
+                Spacer(Modifier.height(4.dp))
+                StatusRow(
+                    label = "Settings Schema",
+                    value = "v${state.settingsSchemaVersion}",
+                    valueColor = TextSecondary,
+                )
+                Spacer(Modifier.height(4.dp))
+                StatusRow(
+                    label = "Sleep Score Algorithm",
+                    value = "v${SleepScoreWeights.MODEL_VERSION}",
+                    valueColor = TextSecondary,
+                )
             }
         }
     }
