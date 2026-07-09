@@ -17,7 +17,10 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -39,24 +42,33 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.runconnect.app.domain.model.ActivityType
+import com.runconnect.app.domain.model.ElevatedRhrAlert
+import com.runconnect.app.domain.model.HrByTypeStats
+import com.runconnect.app.domain.model.HrZone
+import com.runconnect.app.domain.model.LowRhrAlert
+import com.runconnect.app.domain.model.RhrRollingAvgs
+import com.runconnect.app.domain.model.WorkoutRecoveryPoint
 import com.runconnect.app.ui.components.HrZoneBar
+import com.runconnect.app.ui.components.SectionHeader
+import com.runconnect.app.ui.components.SmallStatItem
 import com.runconnect.app.ui.components.axisLabelStyle
 import com.runconnect.app.ui.components.chartScrubber
 import com.runconnect.app.ui.components.drawScrubberTooltip
 import com.runconnect.app.ui.components.epochSecondsToMonthDay
 import com.runconnect.app.ui.components.uiColor
-import kotlin.math.roundToInt
-import com.runconnect.app.domain.model.HrZone
-import com.runconnect.app.ui.components.SectionHeader
-import com.runconnect.app.ui.components.SmallStatItem
+import com.runconnect.app.ui.theme.AmberAccent
 import com.runconnect.app.ui.theme.Background
 import com.runconnect.app.ui.theme.BlueAccent
 import com.runconnect.app.ui.theme.CardDark
+import com.runconnect.app.ui.theme.CoralAccent
 import com.runconnect.app.ui.theme.HeartRate
 import com.runconnect.app.ui.theme.TealPrimary
 import com.runconnect.app.ui.theme.TextPrimary
 import com.runconnect.app.ui.theme.TextSecondary
 import com.runconnect.app.ui.theme.PurpleAccent
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 @Composable
 fun HeartRateScreen(viewModel: HeartRateViewModel = hiltViewModel()) {
@@ -71,7 +83,7 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = hiltViewModel()) {
                 style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                 color = TextPrimary,
             )
-            Text("Last 30 days", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+            Text("Last 90 days", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
         }
 
         if (state.isLoading) {
@@ -82,6 +94,42 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = hiltViewModel()) {
         }
 
         LazyColumn(contentPadding = PaddingValues(bottom = 32.dp)) {
+
+            // Current HR (12.2)
+            if (state.currentHrBpm != null) {
+                item {
+                    Row(
+                        modifier = Modifier
+                            .padding(horizontal = 20.dp)
+                            .padding(bottom = 16.dp)
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(CardDark)
+                            .padding(horizontal = 20.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Column {
+                            Text(
+                                "Current Heart Rate",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = TextSecondary,
+                            )
+                            Text(
+                                "${state.currentHrBpm} bpm",
+                                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                                color = HeartRate,
+                            )
+                        }
+                        Text(
+                            "From today's data",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary,
+                        )
+                    }
+                }
+            }
+
             // Summary stats
             item {
                 Box(
@@ -104,7 +152,7 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = hiltViewModel()) {
                         )
                         SmallStatItem(
                             label = "Max Recorded",
-                            value = "${state.maxRecordedHr} bpm",
+                            value = if (state.maxRecordedHr > 0) "${state.maxRecordedHr} bpm" else "--",
                             valueColor = HeartRate,
                         )
                         SmallStatItem(
@@ -116,11 +164,43 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = hiltViewModel()) {
                 }
             }
 
-            // Resting HR trend (from dedicated RestingHeartRateRecord)
+            // Enhanced RHR stats (12.3)
+            if (state.rhrSevenDayAvg != null || state.rhrThirtyDayBaseline != null) {
+                item {
+                    EnhancedRhrStatsCard(
+                        sevenDayAvg = state.rhrSevenDayAvg,
+                        thirtyDayBaseline = state.rhrThirtyDayBaseline,
+                        delta = state.rhrDeltaFromBaseline,
+                        modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp),
+                    )
+                }
+            }
+
+            // Elevated RHR alert (12.12)
+            if (state.elevatedRhrAlert != null) {
+                item {
+                    ElevatedRhrAlertBanner(
+                        alert = state.elevatedRhrAlert,
+                        modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp),
+                    )
+                }
+            }
+
+            // Low RHR alert (12.13)
+            if (state.lowRhrAlert != null) {
+                item {
+                    LowRhrAlertBanner(
+                        alert = state.lowRhrAlert,
+                        modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp),
+                    )
+                }
+            }
+
+            // Resting HR trend chart (12.3)
             if (state.restingHrHistory.size >= 3) {
                 item {
                     Column(modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp)) {
-                        SectionHeader("Resting HR Trend (30 days)")
+                        SectionHeader("Resting HR Trend")
                         Spacer(Modifier.height(10.dp))
                         RestingHrChart(
                             data = state.restingHrHistory,
@@ -130,7 +210,27 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = hiltViewModel()) {
                 }
             }
 
-            // HRV trend (from dedicated HeartRateVariabilityRmssdRecord)
+            // Rolling averages (12.10)
+            if (state.rhrRollingAvgs != null) {
+                item {
+                    RollingAveragesCard(
+                        avgs = state.rhrRollingAvgs,
+                        modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp),
+                    )
+                }
+            }
+
+            // Baseline deviation (12.11)
+            if (state.rhrBaselineDeviation != null) {
+                item {
+                    BaselineDeviationCard(
+                        deviation = state.rhrBaselineDeviation,
+                        modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp),
+                    )
+                }
+            }
+
+            // HRV trend
             if (state.hrvHistory.size >= 3) {
                 item {
                     Column(modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp)) {
@@ -144,7 +244,7 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = hiltViewModel()) {
                 }
             }
 
-            // HR zones
+            // HR zones (existing)
             item {
                 Column(modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp)) {
                     SectionHeader("Training Zones")
@@ -164,6 +264,27 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = hiltViewModel()) {
                 }
             }
 
+            // Recovery trends (12.14)
+            if (state.recoveryTrends.size >= 3) {
+                item {
+                    RecoveryTrendsCard(
+                        trends = state.recoveryTrends,
+                        modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp),
+                    )
+                }
+            }
+
+            // HR by activity type (12.16)
+            if (state.hrByActivityType.isNotEmpty()) {
+                item {
+                    HrByActivityTypeCard(
+                        hrByType = state.hrByActivityType,
+                        modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp),
+                    )
+                }
+            }
+
+            // About HR Zones (existing)
             item {
                 Column(modifier = Modifier.padding(horizontal = 20.dp)) {
                     SectionHeader("About HR Zones")
@@ -177,6 +298,298 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = hiltViewModel()) {
                     ).forEach { (zone, range, desc) ->
                         ZoneInfoRow(zone = zone, range = range, description = desc)
                         Spacer(Modifier.height(6.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EnhancedRhrStatsCard(
+    sevenDayAvg: Int?,
+    thirtyDayBaseline: Int?,
+    delta: Int?,
+    modifier: Modifier = Modifier,
+) {
+    val deltaColor = when {
+        delta == null -> TextSecondary
+        delta > 5 -> CoralAccent
+        delta > 0 -> AmberAccent
+        delta < -5 -> BlueAccent
+        else -> TealPrimary
+    }
+    val deltaSign = if ((delta ?: 0) > 0) "+" else ""
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(CardDark)
+            .padding(20.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+        ) {
+            SmallStatItem(
+                label = "7-day avg",
+                value = if (sevenDayAvg != null) "$sevenDayAvg bpm" else "--",
+                valueColor = TextPrimary,
+            )
+            SmallStatItem(
+                label = "30-day baseline",
+                value = if (thirtyDayBaseline != null) "$thirtyDayBaseline bpm" else "--",
+                valueColor = TextSecondary,
+            )
+            if (delta != null) {
+                SmallStatItem(
+                    label = "vs baseline",
+                    value = "$deltaSign$delta bpm",
+                    valueColor = deltaColor,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ElevatedRhrAlertBanner(
+    alert: ElevatedRhrAlert,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(CoralAccent.copy(alpha = 0.10f))
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Icon(Icons.Filled.Warning, contentDescription = null, tint = CoralAccent, modifier = Modifier.size(18.dp))
+            Text(
+                "Resting HR elevated: ${alert.currentAvg} bpm (baseline ${alert.baseline} bpm)",
+                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                color = CoralAccent,
+            )
+        }
+        Text(
+            "Possible contributing factors — not a diagnosis:",
+            style = MaterialTheme.typography.labelSmall,
+            color = CoralAccent.copy(alpha = 0.8f),
+        )
+        alert.possibleCauses.forEach { cause ->
+            Text("• $cause", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+        }
+    }
+}
+
+@Composable
+private fun LowRhrAlertBanner(
+    alert: LowRhrAlert,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(BlueAccent.copy(alpha = 0.10f))
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(Icons.Filled.Warning, contentDescription = null, tint = BlueAccent, modifier = Modifier.size(18.dp))
+        Column {
+            Text(
+                "Unusually low resting HR: ${alert.currentAvg} bpm (baseline ${alert.baseline} bpm)",
+                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                color = BlueAccent,
+            )
+            Text(
+                "Common in well-trained athletes. May also result from sensor error.",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary,
+            )
+        }
+    }
+}
+
+@Composable
+private fun RollingAveragesCard(
+    avgs: RhrRollingAvgs,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(CardDark)
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(
+            "Resting HR Rolling Averages",
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = TextPrimary,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+        ) {
+            listOf("7D" to avgs.d7, "14D" to avgs.d14, "30D" to avgs.d30, "90D" to avgs.d90)
+                .forEach { (label, avg) ->
+                    SmallStatItem(label = label, value = if (avg != null) "$avg bpm" else "--")
+                }
+        }
+    }
+}
+
+@Composable
+private fun BaselineDeviationCard(
+    deviation: Float,
+    modifier: Modifier = Modifier,
+) {
+    val deviationColor = when {
+        abs(deviation) <= 1f -> TealPrimary
+        abs(deviation) <= 2f -> AmberAccent
+        else -> CoralAccent
+    }
+    val sign = if (deviation > 0) "+" else ""
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(CardDark)
+            .padding(horizontal = 20.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Column {
+            Text(
+                "Baseline Deviation",
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                color = TextPrimary,
+            )
+            Text(
+                "SD from personal mean",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary,
+            )
+        }
+        Text(
+            "$sign${"%.1f".format(deviation)} SD",
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+            color = deviationColor,
+        )
+    }
+}
+
+@Composable
+private fun RecoveryTrendsCard(
+    trends: List<WorkoutRecoveryPoint>,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(CardDark)
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            "HR Recovery Trend",
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = TextPrimary,
+        )
+        Text(
+            "1-min drop after workouts",
+            style = MaterialTheme.typography.bodySmall,
+            color = TextSecondary,
+        )
+        Spacer(Modifier.height(4.dp))
+        trends.takeLast(10).forEach { point ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "${point.date.month.name.lowercase().replaceFirstChar { it.uppercase() }.take(3)} ${point.date.dayOfMonth}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    if (point.drop1Min != null) {
+                        Text(
+                            "1m: −${point.drop1Min}",
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                            color = if (point.drop1Min >= 20) TealPrimary
+                            else if (point.drop1Min >= 12) AmberAccent
+                            else TextSecondary,
+                        )
+                    }
+                    if (point.drop5Min != null) {
+                        Text(
+                            "5m: −${point.drop5Min}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (point.drop5Min >= 50) TealPrimary
+                            else if (point.drop5Min >= 30) AmberAccent
+                            else TextSecondary,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HrByActivityTypeCard(
+    hrByType: Map<ActivityType, HrByTypeStats>,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(CardDark)
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(
+            "HR by Activity Type",
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = TextPrimary,
+        )
+        hrByType.entries.sortedByDescending { it.value.activityCount }.forEach { (type, stats) ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    type.label,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextPrimary,
+                    modifier = Modifier.weight(1f),
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("Avg", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                        Text("${stats.avgHr}", style = MaterialTheme.typography.bodySmall, color = HeartRate)
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("Max", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                        Text("${stats.maxHr}", style = MaterialTheme.typography.bodySmall, color = TextPrimary)
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("Count", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                        Text("${stats.activityCount}", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
                     }
                 }
             }
@@ -231,7 +644,6 @@ private fun RestingHrChart(data: List<Pair<Long, Int>>, modifier: Modifier = Mod
                 drawCircle(color = BlueAccent.copy(alpha = 0.4f), radius = 2.5.dp.toPx(), center = pt)
             }
 
-            // Y axis labels: top=maxBpm, bottom=minBpm
             val axisStyle = axisLabelStyle
             val midBpm = (minBpm + maxBpm) / 2
             listOf(
@@ -248,7 +660,6 @@ private fun RestingHrChart(data: List<Pair<Long, Int>>, modifier: Modifier = Mod
                 )
             }
 
-            // X axis labels: dates
             val midIdx = data.size / 2
             listOf(0f to data.first().first, 0.5f to data[midIdx].first, 1f to data.last().first)
                 .forEach { (frac, epoch) ->
@@ -263,7 +674,6 @@ private fun RestingHrChart(data: List<Pair<Long, Int>>, modifier: Modifier = Mod
                     drawText(textMeasurer, label, topLeft = Offset(lx, chartH + 3.dp.toPx()), style = axisStyle)
                 }
 
-            // Scrubber
             scrubberX?.let { sx ->
                 val idx = (sx / chartW * (data.size - 1)).roundToInt().coerceIn(0, data.size - 1)
                 val pt = pts[idx]
@@ -276,7 +686,6 @@ private fun RestingHrChart(data: List<Pair<Long, Int>>, modifier: Modifier = Mod
         }
     }
 }
-
 
 @Composable
 private fun ZoneInfoRow(zone: HrZone, range: String, description: String) {
@@ -345,7 +754,6 @@ private fun HrvChart(data: List<Pair<Long, Double>>, modifier: Modifier = Modifi
                 drawCircle(color = PurpleAccent.copy(alpha = 0.4f), radius = 2.5.dp.toPx(), center = pt)
             }
 
-            // Y axis labels: top=maxVal, bottom=minVal
             val axisStyle = axisLabelStyle
             val midVal = (minVal + maxVal) / 2
             listOf(
@@ -362,7 +770,6 @@ private fun HrvChart(data: List<Pair<Long, Double>>, modifier: Modifier = Modifi
                 )
             }
 
-            // X axis labels: dates
             val midIdx = data.size / 2
             listOf(0f to data.first().first, 0.5f to data[midIdx].first, 1f to data.last().first)
                 .forEach { (frac, epoch) ->
@@ -377,7 +784,6 @@ private fun HrvChart(data: List<Pair<Long, Double>>, modifier: Modifier = Modifi
                     drawText(textMeasurer, label, topLeft = Offset(lx, chartH + 3.dp.toPx()), style = axisStyle)
                 }
 
-            // Scrubber
             scrubberX?.let { sx ->
                 val idx = (sx / chartW * (values.size - 1)).roundToInt().coerceIn(0, values.size - 1)
                 val pt = pts[idx]
@@ -390,4 +796,3 @@ private fun HrvChart(data: List<Pair<Long, Double>>, modifier: Modifier = Modifi
         }
     }
 }
-

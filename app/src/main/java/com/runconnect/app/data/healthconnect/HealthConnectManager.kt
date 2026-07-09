@@ -434,6 +434,21 @@ class HealthConnectManager @Inject constructor(
         }.getOrNull()
     }
 
+    suspend fun readIntradayHrForDate(date: java.time.LocalDate, zone: ZoneId): List<HeartRateSample> {
+        val c = client ?: return emptyList()
+        val start = date.atStartOfDay(zone).toInstant()
+        val end = date.plusDays(1).atStartOfDay(zone).toInstant()
+        return c.readRecords(
+            ReadRecordsRequest(
+                recordType = HeartRateRecord::class,
+                timeRangeFilter = TimeRangeFilter.between(start, end),
+                ascendingOrder = true,
+            )
+        ).records.flatMap { record ->
+            record.samples.map { HeartRateSample(timestamp = it.time, bpm = it.beatsPerMinute) }
+        }
+    }
+
     suspend fun readBodyFatHistory(days: Int = 90): List<BodyMetricsSample> {
         val c = client ?: return emptyList()
         val start = Instant.now().minus(days.toLong(), ChronoUnit.DAYS)

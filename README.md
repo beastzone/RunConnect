@@ -77,10 +77,18 @@ Download the latest APK from the [Releases](https://github.com/beastzone/RunConn
 - **Per-session detail screen** — tap any night to open a full-detail view with all of the above, navigable with the back button
 
 ### Heart Rate
-- HR zone distribution (Zone 1–5 based on % of max HR)
-- **Resting HR trend chart** — uses dedicated `RestingHeartRateRecord` from Garmin/Withings (not estimated from activity samples); X/Y axis labels + touch scrubbing
+- **Current HR tile** — latest intraday HR sample from today (12.2)
+- HR zone distribution (Zone 1–5 based on % of max HR or Heart Rate Reserve)
+- **Enhanced resting HR stats** — 7-day average, 30-day baseline, delta from baseline with color coding (12.3)
+- **Rolling averages** — 4-cell grid: 7D / 14D / 30D / 90D resting HR (12.10)
+- **Elevated RHR alert** — fires when 7-day avg > 30-day baseline + 5 bpm; shows 7 possible contributing factors (not a diagnosis) in a coral banner (12.12)
+- **Low RHR alert** — fires when 7-day avg < 30-day baseline − 8 bpm and < 45 bpm; contextualises athletic fitness (12.13)
+- **Baseline deviation** — standard deviations from personal mean; green ≤ 1 SD, amber 1–2 SD, coral > 2 SD (12.11)
+- **Resting HR trend chart** — 90-day history from dedicated `RestingHeartRateRecord`; X/Y axis labels + touch scrubbing
 - **HRV trend chart** — X/Y axis labels + touch scrubbing (ms tooltip with date)
-- Max HR configurable in Settings
+- **HR recovery trends** — 1-min and 5-min post-workout HR drop listed per session; color-coded by drop magnitude (12.14)
+- **HR by activity type** — avg HR, max HR, and count per activity type; sorted by frequency (12.16)
+- Max HR and zone model (% Max HR / HRR) configurable in Settings
 
 ### Body Metrics _(new)_
 - Weight trend chart (90 days from Withings via Health Connect) — X/Y axis labels + touch scrubbing
