@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.runconnect.app.data.healthconnect.HealthConnectManager
 import com.runconnect.app.data.preferences.AppPreferences
 import com.runconnect.app.data.repository.ActivityRepository
+import com.runconnect.app.data.repository.SleepRepository
 import com.runconnect.app.domain.analytics.ActivityHrAnalytics
 import com.runconnect.app.domain.model.ActivityType
 import com.runconnect.app.domain.model.ElevatedRhrAlert
@@ -14,6 +15,7 @@ import com.runconnect.app.domain.model.HrByTypeStats
 import com.runconnect.app.domain.model.HrZone
 import com.runconnect.app.domain.model.LowRhrAlert
 import com.runconnect.app.domain.model.RhrRollingAvgs
+import com.runconnect.app.domain.model.SleepSession
 import com.runconnect.app.domain.model.WorkoutRecoveryPoint
 import com.runconnect.app.domain.model.ZoneModel
 import com.runconnect.app.domain.model.computeHrZone
@@ -23,7 +25,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZoneOffset
@@ -57,8 +61,11 @@ data class HeartRateUiState(
     val recoveryTrends: List<WorkoutRecoveryPoint> = emptyList(),
     // 12.16 HR by activity type
     val hrByActivityType: Map<ActivityType, HrByTypeStats> = emptyMap(),
-    // 12.2 / 12.1 Today's HR
-    val todayHrSamples: List<HeartRateSample> = emptyList(),
+    // Daily intraday HR view with day navigation
+    val selectedDate: LocalDate = LocalDate.now(),
+    val selectedDateHrSamples: List<HeartRateSample> = emptyList(),
+    val selectedDateSleepWindows: List<Pair<Instant, Instant>> = emptyList(),
+    val isLoadingIntraday: Boolean = false,
     val currentHrBpm: Int? = null,
     // 12.9 Calendar heatmap data (date → rhr bpm)
     val rhrCalendarData: List<Pair<LocalDate, Int>> = emptyList(),
@@ -67,6 +74,7 @@ data class HeartRateUiState(
 @HiltViewModel
 class HeartRateViewModel @Inject constructor(
     private val activityRepository: ActivityRepository,
+    private val sleepRepository: SleepRepository,
     private val healthConnectManager: HealthConnectManager,
     private val appPreferences: AppPreferences,
 ) : ViewModel() {
@@ -74,11 +82,54 @@ class HeartRateViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(HeartRateUiState())
     val uiState: StateFlow<HeartRateUiState> = _uiState
 
+    // All sleep sessions pre-loaded for fast day-navigation sleep-window lookups
+    private var allSleepSessions: List<SleepSession> = emptyList()
+
     init {
         loadData()
     }
 
     fun refresh() = loadData()
+
+    fun navigateToDate(date: LocalDate) {
+        _uiState.update { it.copy(selectedDate = date, isLoadingIntraday = true, selectedDateHrSamples = emptyList()) }
+        viewModelScope.launch {
+            val samples = runCatching {
+                healthConnectManager.readIntradayHrForDate(date, ZoneId.systemDefault())
+            }.getOrDefault(emptyList())
+            _uiState.update {
+                it.copy(
+                    selectedDateHrSamples = samples,
+                    currentHrBpm = if (date == LocalDate.now()) samples.lastOrNull()?.bpm?.toInt() else null,
+                    selectedDateSleepWindows = sleepWindowsForDate(date, allSleepSessions),
+                    isLoadingIntraday = false,
+                )
+            }
+        }
+    }
+
+    fun navigatePrev() {
+        val date = _uiState.value.selectedDate
+        if (date.isAfter(LocalDate.now().minusDays(89))) navigateToDate(date.minusDays(1))
+    }
+
+    fun navigateNext() {
+        val date = _uiState.value.selectedDate
+        if (date.isBefore(LocalDate.now())) navigateToDate(date.plusDays(1))
+    }
+
+    private fun sleepWindowsForDate(date: LocalDate, sessions: List<SleepSession>): List<Pair<Instant, Instant>> {
+        val zone = ZoneId.systemDefault()
+        val dayStart = date.atStartOfDay(zone).toInstant()
+        val dayEnd = date.plusDays(1).atStartOfDay(zone).toInstant()
+        return sessions
+            .filter { it.endTime.isAfter(dayStart) && it.startTime.isBefore(dayEnd) }
+            .map {
+                val clampedStart = if (it.startTime.isBefore(dayStart)) dayStart else it.startTime
+                val clampedEnd = if (it.endTime.isAfter(dayEnd)) dayEnd else it.endTime
+                clampedStart to clampedEnd
+            }
+    }
 
     private fun loadData() {
         viewModelScope.launch {
@@ -92,23 +143,30 @@ class HeartRateViewModel @Inject constructor(
                 restingHrOverride = restingHrOverride,
             )
 
-            // Load dedicated resting HR + HRV + intraday HR in parallel
+            // Load all data sources in parallel
             val restingHrDeferred = async {
                 runCatching { healthConnectManager.readRestingHeartRateHistory(90) }.getOrDefault(emptyList())
             }
             val hrvDeferred = async {
                 runCatching { healthConnectManager.readHrvHistory(30) }.getOrDefault(emptyList())
             }
-            val todayHrDeferred = async {
+            val intradayDeferred = async {
                 runCatching {
                     healthConnectManager.readIntradayHrForDate(LocalDate.now(), ZoneId.systemDefault())
+                }.getOrDefault(emptyList())
+            }
+            val sleepDeferred = async {
+                runCatching {
+                    sleepRepository.getSleepSessions(90).first().getOrDefault(emptyList())
                 }.getOrDefault(emptyList())
             }
 
             activityRepository.getActivities(daysBack = 90).collectLatest { result ->
                 val rhrHistory90 = restingHrDeferred.await()
                 val hrvRaw = hrvDeferred.await()
-                val todayHr = todayHrDeferred.await()
+                val todayHr = intradayDeferred.await()
+                val sleepSessions = sleepDeferred.await()
+                allSleepSessions = sleepSessions
 
                 val avgRhrFromHistory = if (rhrHistory90.isNotEmpty())
                     rhrHistory90.map { it.second }.average().toInt() else 0
@@ -116,7 +174,7 @@ class HeartRateViewModel @Inject constructor(
                     else if (avgRhrFromHistory > 0) avgRhrFromHistory else 60
 
                 result.onSuccess { activities ->
-                    // Zone distribution (from last 30 days of activities)
+                    // Zone distribution (from last 60 activity samples)
                     val zoneMinutes = mutableMapOf<HrZone, Long>()
                     activities.takeLast(60).forEach { activity ->
                         activity.heartRateSamples.forEach { sample ->
@@ -215,9 +273,6 @@ class HeartRateViewModel @Inject constructor(
                             )
                         }
 
-                    // Today's HR
-                    val currentBpm = todayHr.lastOrNull()?.bpm?.toInt()
-
                     // Calendar heatmap data (12.9) — one point per day, most recent wins
                     val calendarData = rhrHistory90
                         .map { (instant, bpm) ->
@@ -225,6 +280,8 @@ class HeartRateViewModel @Inject constructor(
                         }
                         .sortedBy { it.first }
                         .distinctBy { it.first }
+
+                    val todaySleepWindows = sleepWindowsForDate(LocalDate.now(), sleepSessions)
 
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
@@ -243,8 +300,9 @@ class HeartRateViewModel @Inject constructor(
                         lowRhrAlert = low,
                         recoveryTrends = recoveryTrends,
                         hrByActivityType = hrByType,
-                        todayHrSamples = todayHr,
-                        currentHrBpm = currentBpm,
+                        selectedDateHrSamples = todayHr,
+                        currentHrBpm = todayHr.lastOrNull()?.bpm?.toInt(),
+                        selectedDateSleepWindows = todaySleepWindows,
                         rhrCalendarData = calendarData,
                     )
                 }.onFailure { e ->

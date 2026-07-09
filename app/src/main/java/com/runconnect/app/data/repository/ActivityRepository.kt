@@ -164,8 +164,10 @@ class ActivityRepository @Inject constructor(
     }
 
     suspend fun getActivityById(id: String): Activity? {
-        // L1 hit
-        cache.firstOrNull { it.id == id }?.let { return it }
+        // L1 hit — skip if HR samples absent; Room has them from the last proper sync
+        cache.firstOrNull { it.id == id }?.let { cached ->
+            if (cached.heartRateSamples.isNotEmpty()) return cached
+        }
         // L2: Room with sub-tables for full detail
         activityDao.getById(id)?.let { entity ->
             val hrSamples = activityHrSampleDao.getForActivity(id).map { it.toDomain() }

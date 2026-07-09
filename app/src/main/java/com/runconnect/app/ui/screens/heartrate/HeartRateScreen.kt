@@ -18,9 +18,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -51,6 +54,7 @@ import com.runconnect.app.domain.model.RhrRollingAvgs
 import com.runconnect.app.domain.model.WorkoutRecoveryPoint
 import com.runconnect.app.ui.components.HrCalendarHeatmap
 import com.runconnect.app.ui.components.HrZoneBar
+import com.runconnect.app.ui.components.IntradayHrChart
 import com.runconnect.app.ui.components.SectionHeader
 import com.runconnect.app.ui.components.SmallStatItem
 import com.runconnect.app.ui.components.axisLabelStyle
@@ -58,6 +62,8 @@ import com.runconnect.app.ui.components.chartScrubber
 import com.runconnect.app.ui.components.drawScrubberTooltip
 import com.runconnect.app.ui.components.epochSecondsToMonthDay
 import com.runconnect.app.ui.components.uiColor
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import com.runconnect.app.ui.theme.AmberAccent
 import com.runconnect.app.ui.theme.Background
 import com.runconnect.app.ui.theme.BlueAccent
@@ -100,7 +106,50 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = hiltViewModel()) {
         val rhrRollingAvgs = state.rhrRollingAvgs
         val rhrBaselineDeviation = state.rhrBaselineDeviation
 
+        val dateFmt = DateTimeFormatter.ofPattern("EEE, MMM d")
+        val today = LocalDate.now()
+        val hasPrev = state.selectedDate.isAfter(today.minusDays(89))
+        val hasNext = state.selectedDate.isBefore(today)
+
         LazyColumn(contentPadding = PaddingValues(bottom = 32.dp)) {
+
+            // Daily HR date navigation
+            item(key = "date_nav") {
+                DateNavHeader(
+                    dateLabel = state.selectedDate.format(dateFmt),
+                    hasPrev = hasPrev,
+                    hasNext = hasNext,
+                    onPrev = { viewModel.navigatePrev() },
+                    onNext = { viewModel.navigateNext() },
+                    modifier = Modifier
+                        .padding(horizontal = 20.dp)
+                        .padding(bottom = 8.dp)
+                        .fillMaxWidth(),
+                )
+            }
+
+            // Daily continuous HR chart with sleep overlay
+            item(key = "intraday_chart") {
+                Column(modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp)) {
+                    SectionHeader("Heart Rate — ${state.selectedDate.format(dateFmt)}")
+                    Spacer(Modifier.height(10.dp))
+                    if (state.isLoadingIntraday) {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().height(220.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            CircularProgressIndicator(color = TealPrimary, modifier = Modifier.size(28.dp))
+                        }
+                    } else {
+                        IntradayHrChart(
+                            samples = state.selectedDateHrSamples,
+                            sleepWindows = state.selectedDateSleepWindows,
+                            date = state.selectedDate,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+            }
 
             // Current HR (12.2)
             if (state.currentHrBpm != null) {
@@ -814,6 +863,42 @@ private fun HrvChart(data: List<Pair<Long, Double>>, modifier: Modifier = Modifi
                 drawCircle(Color.White, 2.5.dp.toPx(), pt)
                 drawScrubberTooltip(textMeasurer, "%.0f ms · ${epochSecondsToMonthDay(epoch)}".format(hrv), pt.x, pt.y, chartW)
             }
+        }
+    }
+}
+
+@Composable
+private fun DateNavHeader(
+    dateLabel: String,
+    hasPrev: Boolean,
+    hasNext: Boolean,
+    onPrev: () -> Unit,
+    onNext: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClick = onPrev, enabled = hasPrev) {
+            Icon(
+                Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Previous day",
+                tint = if (hasPrev) TextPrimary else TextSecondary.copy(alpha = 0.3f),
+            )
+        }
+        Text(
+            dateLabel,
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+            color = TextPrimary,
+        )
+        IconButton(onClick = onNext, enabled = hasNext) {
+            Icon(
+                Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = "Next day",
+                tint = if (hasNext) TextPrimary else TextSecondary.copy(alpha = 0.3f),
+            )
         }
     }
 }
