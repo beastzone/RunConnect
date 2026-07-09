@@ -3,6 +3,7 @@ package com.runconnect.app.ui.screens.sleep
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.runconnect.app.data.healthconnect.HealthConnectManager
 import com.runconnect.app.data.preferences.AppPreferences
 import com.runconnect.app.data.repository.SleepRepository
 import com.runconnect.app.domain.model.SleepAnnotation
@@ -13,6 +14,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.time.ZoneId
 import javax.inject.Inject
 
 data class SleepDetailUiState(
@@ -30,6 +32,7 @@ data class SleepDetailUiState(
 class SleepDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val sleepRepository: SleepRepository,
+    private val healthConnectManager: HealthConnectManager,
     private val appPreferences: AppPreferences,
 ) : ViewModel() {
 
@@ -61,6 +64,11 @@ class SleepDetailViewModel @Inject constructor(
                         historicalAvgRem = avgRem,
                         historicalAvgScore = avgScore,
                     )
+                    // If the session came back without HR (Room cache path never stores HR),
+                    // fetch it directly using the intraday endpoint which is known to work.
+                    if (session != null && session.heartRateSamples.isEmpty()) {
+                        launch { augmentSessionHr(session) }
+                    }
                 }.onFailure {
                     _uiState.value = _uiState.value.copy(isLoading = false)
                 }
@@ -72,6 +80,33 @@ class SleepDetailViewModel @Inject constructor(
                     annotation = annotations[sessionId] ?: SleepAnnotation(),
                 )
             }
+        }
+    }
+
+    private suspend fun augmentSessionHr(session: SleepSession) {
+        val zone = ZoneId.systemDefault()
+        val startDate = session.startTime.atZone(zone).toLocalDate()
+        val endDate = session.endTime.atZone(zone).toLocalDate()
+
+        val samples = buildList {
+            var date = startDate
+            while (!date.isAfter(endDate)) {
+                val intradayHr = runCatching {
+                    healthConnectManager.readIntradayHrForDate(date, zone)
+                }.getOrDefault(emptyList())
+                addAll(
+                    intradayHr
+                        .filter { it.timestamp >= session.startTime && it.timestamp <= session.endTime }
+                        .map { it.timestamp to it.bpm.toInt() }
+                )
+                date = date.plusDays(1)
+            }
+        }.sortedBy { it.first }
+
+        if (samples.isNotEmpty()) {
+            _uiState.value = _uiState.value.copy(
+                session = session.copy(heartRateSamples = samples),
+            )
         }
     }
 

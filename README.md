@@ -75,6 +75,7 @@ Download the latest APK from the [Releases](https://github.com/beastzone/RunConn
 - **Weekly reports** — last 4 ISO weeks: avg duration, avg score, avg debt, consistency, best/worst night
 - **Monthly summary** — avg duration, weekday vs weekend split, longest/shortest night
 - **Per-session detail screen** — tap any night to open a full-detail view with all of the above, navigable with the back button
+- **Sleep detail hypnogram fix** — detail screen now uses the same proportional-depth hypnogram as the overview (Awake top → Deep bottom); HR chart augmented from intraday endpoint when the repository cache returns a session without HR samples
 
 ### Heart Rate
 - **Continuous HR from wearables** — second-by-second HR samples from Garmin Connect, Samsung Health, and Withings (all via Health Connect) now flow into all analytics; Garmin's day-spanning `HeartRateRecord` is filtered at sample level so per-activity samples are correctly extracted

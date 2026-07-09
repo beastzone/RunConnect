@@ -170,7 +170,7 @@ fun SleepDetailScreen(
             // 11.2 Interactive Stage Timeline
             item {
                 DetailCard(title = "Sleep Stages") {
-                    SleepStageTimeline(session = session, modifier = Modifier.fillMaxWidth())
+                    SleepHypnogram(session = session, modifier = Modifier.fillMaxWidth())
                     Spacer(Modifier.height(10.dp))
                     SleepStageLegendRow()
                 }

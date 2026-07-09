@@ -163,18 +163,32 @@ class ActivityRepository @Inject constructor(
         }
     }
 
+    // Session-lifetime memo: HC already confirmed these activity IDs have no HR, avoids repeated re-fetches.
+    private val confirmedNoHrIds = mutableSetOf<String>()
+
     suspend fun getActivityById(id: String): Activity? {
-        // L1 hit — skip if HR samples absent; Room has them from the last proper sync
+        // L1: skip only if HR absent AND HC hasn't confirmed no-HR for this activity
         cache.firstOrNull { it.id == id }?.let { cached ->
-            if (cached.heartRateSamples.isNotEmpty()) return cached
+            if (cached.heartRateSamples.isNotEmpty() || id in confirmedNoHrIds) return cached
         }
-        // L2: Room with sub-tables for full detail
+        // L2: Room — only return when HR rows are present; fall through to HC otherwise
         activityDao.getById(id)?.let { entity ->
             val hrSamples = activityHrSampleDao.getForActivity(id).map { it.toDomain() }
-            val route = routePointDao.getForActivity(id).map { it.toDomain() }
-            return entity.toDomain(hrSamples, route)
+            if (hrSamples.isNotEmpty()) {
+                val route = routePointDao.getForActivity(id).map { it.toDomain() }
+                return entity.toDomain(hrSamples, route)
+            }
         }
-        return runCatching { healthConnectManager.readActivityById(id) }.getOrNull()
+        // L3: HC fresh read — backfills Room + L1 so subsequent taps are fast
+        val fresh = runCatching { healthConnectManager.readActivityById(id) }.getOrNull() ?: return null
+        if (fresh.heartRateSamples.isNotEmpty()) {
+            activityHrSampleDao.upsertAll(fresh.heartRateSamples.map { it.toEntity(fresh.id) })
+            val idx = cache.indexOfFirst { it.id == fresh.id }
+            if (idx >= 0) cache[idx] = fresh else cache.add(fresh)
+        } else {
+            confirmedNoHrIds.add(id)
+        }
+        return fresh
     }
 
     suspend fun getActivityWithRoute(id: String): Pair<Activity?, Boolean> {
