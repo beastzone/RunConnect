@@ -94,6 +94,12 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = hiltViewModel()) {
             return
         }
 
+        // Capture nullable state fields as locals so Kotlin can smart-cast inside item blocks
+        val elevatedRhrAlert = state.elevatedRhrAlert
+        val lowRhrAlert = state.lowRhrAlert
+        val rhrRollingAvgs = state.rhrRollingAvgs
+        val rhrBaselineDeviation = state.rhrBaselineDeviation
+
         LazyColumn(contentPadding = PaddingValues(bottom = 32.dp)) {
 
             // Current HR (12.2)
@@ -178,20 +184,20 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = hiltViewModel()) {
             }
 
             // Elevated RHR alert (12.12)
-            if (state.elevatedRhrAlert != null) {
+            if (elevatedRhrAlert != null) {
                 item {
                     ElevatedRhrAlertBanner(
-                        alert = state.elevatedRhrAlert,
+                        alert = elevatedRhrAlert,
                         modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp),
                     )
                 }
             }
 
             // Low RHR alert (12.13)
-            if (state.lowRhrAlert != null) {
+            if (lowRhrAlert != null) {
                 item {
                     LowRhrAlertBanner(
-                        alert = state.lowRhrAlert,
+                        alert = lowRhrAlert,
                         modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp),
                     )
                 }
@@ -212,10 +218,10 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = hiltViewModel()) {
             }
 
             // Rolling averages (12.10)
-            if (state.rhrRollingAvgs != null) {
+            if (rhrRollingAvgs != null) {
                 item {
                     RollingAveragesCard(
-                        avgs = state.rhrRollingAvgs,
+                        avgs = rhrRollingAvgs,
                         modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp),
                     )
                 }
@@ -236,10 +242,10 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = hiltViewModel()) {
             }
 
             // Baseline deviation (12.11)
-            if (state.rhrBaselineDeviation != null) {
+            if (rhrBaselineDeviation != null) {
                 item {
                     BaselineDeviationCard(
-                        deviation = state.rhrBaselineDeviation,
+                        deviation = rhrBaselineDeviation,
                         modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp),
                     )
                 }
