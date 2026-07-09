@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.runconnect.app.data.connectivity.ConnectivityRepository
 import com.runconnect.app.data.healthconnect.HealthConnectManager
+import com.runconnect.app.data.healthconnect.HealthConnectStatus
 import com.runconnect.app.data.healthconnect.PermissionInfo
 import com.runconnect.app.data.preferences.AppPreferences
 import com.runconnect.app.data.remote.garmin.GarminAuthManager
@@ -44,6 +45,8 @@ data class SettingsUiState(
     val importProgress: ImportProgress = ImportProgress(),
     val historyImportedLabel: String? = null,
     val isOffline: Boolean = false,
+    val hcConnectionStatus: HealthConnectStatus = HealthConnectStatus.NEVER_CONNECTED,
+    val settingsSchemaVersion: Int = 0,
 ) {
     val healthConnectStatusLabel: String get() = when (healthConnectSdkStatus) {
         HealthConnectClient.SDK_AVAILABLE -> "Available (SDK ${healthConnectSdkStatus})"
@@ -131,6 +134,11 @@ class SettingsViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(isOffline = !online)
             }
         }
+        viewModelScope.launch {
+            appPreferences.settingsSchemaVersion.collect { version ->
+                _uiState.value = _uiState.value.copy(settingsSchemaVersion = version)
+            }
+        }
     }
 
     fun setUseImperial(value: Boolean) = viewModelScope.launch {
@@ -207,14 +215,22 @@ class SettingsViewModel @Inject constructor(
         val granted = runCatching { healthConnectManager.checkPermissions() }.getOrDefault(emptySet())
         val required = healthConnectManager.requiredPermissions
         val permStatuses = healthConnectManager.permissionInfoList.map { it to (it.permission in granted) }
+        val allGranted = required.all { it in granted }
+        val hcStatus = when {
+            !healthConnectManager.isAvailable -> HealthConnectStatus.HC_UNAVAILABLE
+            granted.isEmpty() -> HealthConnectStatus.NEVER_CONNECTED
+            allGranted -> HealthConnectStatus.CONNECTED
+            else -> HealthConnectStatus.LIMITED_PERMISSIONS
+        }
         _uiState.value = _uiState.value.copy(
             healthConnectSdkStatus = healthConnectManager.sdkStatus,
             healthConnectAvailable = healthConnectManager.isAvailable,
-            healthConnectPermissionsGranted = required.all { it in granted },
+            healthConnectPermissionsGranted = allGranted,
             healthConnectGrantedCount = granted.count { it in required },
             healthConnectRequiredCount = required.size,
             cacheActivityCount = activityRepository.cacheSize,
             permissionStatuses = permStatuses,
+            hcConnectionStatus = hcStatus,
         )
     }
 

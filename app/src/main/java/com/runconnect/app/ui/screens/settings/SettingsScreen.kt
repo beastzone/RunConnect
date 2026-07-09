@@ -63,6 +63,7 @@ import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.runconnect.app.data.healthconnect.HealthConnectStatus
 import com.runconnect.app.ui.theme.AmberAccent
 import com.runconnect.app.ui.theme.Background
 import com.runconnect.app.ui.theme.BorderColor
@@ -160,6 +161,17 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                     value = state.healthConnectStatusLabel,
                     valueColor = if (state.healthConnectAvailable) TealPrimary else CoralAccent,
                 )
+                Spacer(Modifier.height(4.dp))
+                val (hcStatusLabel, hcStatusColor) = when (state.hcConnectionStatus) {
+                    HealthConnectStatus.CONNECTED -> "Connected" to TealPrimary
+                    HealthConnectStatus.LIMITED_PERMISSIONS -> "Limited permissions" to AmberAccent
+                    HealthConnectStatus.PERMISSION_REVOKED -> "Permission revoked" to CoralAccent
+                    HealthConnectStatus.HC_UNAVAILABLE -> "Unavailable" to CoralAccent
+                    HealthConnectStatus.SYNC_IN_PROGRESS -> "Syncing…" to AmberAccent
+                    HealthConnectStatus.SYNC_FAILED -> "Sync failed" to CoralAccent
+                    HealthConnectStatus.NEVER_CONNECTED -> "Not connected" to TextSecondary
+                }
+                StatusRow(label = "Connection", value = hcStatusLabel, valueColor = hcStatusColor)
                 Spacer(Modifier.height(4.dp))
                 PermissionsExpandableRow(state = state)
                 Spacer(Modifier.height(4.dp))

@@ -105,6 +105,13 @@ class SleepViewModel @Inject constructor(
                 applySourceFilter(allSessions, filter)
             }
         }
+        viewModelScope.launch {
+            appPreferences.sleepChartRange.first().let { saved ->
+                runCatching { ChartRange.valueOf(saved) }.getOrNull()?.let { range ->
+                    _uiState.value = _uiState.value.copy(chartRange = range)
+                }
+            }
+        }
         loadSleep()
     }
 
@@ -228,6 +235,7 @@ class SleepViewModel @Inject constructor(
             chartRange = range,
             rollingScores = buildRollingScores(state.sessionsByDate, range, LocalDate.now()),
         )
+        viewModelScope.launch { appPreferences.setSleepChartRange(range.name) }
     }
 
     fun selectSessionById(sessionId: String) {
