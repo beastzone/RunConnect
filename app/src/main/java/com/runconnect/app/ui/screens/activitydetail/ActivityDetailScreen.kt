@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -38,20 +39,23 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.runconnect.app.domain.analytics.ActivityHrAnalytics
 import com.runconnect.app.domain.model.Activity
 import com.runconnect.app.domain.model.ActivityType
 import com.runconnect.app.domain.model.averagePaceSecondsPerKm
 import com.runconnect.app.domain.model.averagePaceSecondsPerMile
 import com.runconnect.app.domain.model.distanceKm
 import com.runconnect.app.domain.model.distanceMiles
+import com.runconnect.app.ui.components.ActivityHrChart
 import com.runconnect.app.ui.components.ElevationChart
-import com.runconnect.app.ui.components.HeartRateChart
+import com.runconnect.app.ui.components.HrZoneBar
 import com.runconnect.app.ui.components.PaceChart
 import com.runconnect.app.ui.components.SectionHeader
 import com.runconnect.app.ui.components.SmallStatItem
 import com.runconnect.app.ui.components.accentColor
 import com.runconnect.app.ui.components.icon
 import com.runconnect.app.ui.components.packageToDisplayName
+import com.runconnect.app.ui.theme.AmberAccent
 import com.runconnect.app.ui.theme.Background
 import com.runconnect.app.ui.theme.CardDark
 import com.runconnect.app.ui.theme.CoralAccent
@@ -60,6 +64,7 @@ import com.runconnect.app.ui.theme.TealPrimary
 import com.runconnect.app.ui.theme.TextPrimary
 import com.runconnect.app.ui.theme.TextSecondary
 import com.runconnect.app.utils.FormatUtils
+import kotlin.math.abs
 
 @Composable
 fun ActivityDetailScreen(
@@ -251,18 +256,75 @@ private fun ActivityDetailContent(
             }
         }
 
-        // Heart rate chart
+        // Enhanced heart rate chart
         if (state.hrChartData.size >= 2) {
             item {
                 Column(modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp)) {
                     SectionHeader("Heart Rate")
                     Spacer(Modifier.height(10.dp))
-                    HeartRateChart(
+                    ActivityHrChart(
                         hrData = state.hrChartData,
                         avgHr = activity.averageHeartRate ?: 0,
+                        maxHrSetting = state.maxHrSetting,
+                        activityStartEpoch = activity.startTime.epochSecond,
+                        activityDurationSeconds = activity.durationSeconds,
+                        laps = activity.laps,
+                        zoneModel = state.zoneModel,
+                        restingHr = if (state.restingHrOverride > 0) state.restingHrOverride else 60,
+                        artifacts = state.hrArtifacts,
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
+            }
+        }
+
+        // Artifact warning banner
+        if (state.hrArtifacts.suspectTimestamps.isNotEmpty()) {
+            item {
+                ArtifactWarningBanner(
+                    artifacts = state.hrArtifacts,
+                    modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp),
+                )
+            }
+        }
+
+        // HR Zones card
+        if (state.hrZoneDistribution != null && state.hrZoneDistribution.totalSamples > 0) {
+            item {
+                HrZonesCard(
+                    distribution = state.hrZoneDistribution,
+                    modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp),
+                )
+            }
+        }
+
+        // HR Drift card (only when significant)
+        if (state.hrDrift != null && state.hrDrift.isSignificant) {
+            item {
+                HrDriftCard(
+                    drift = state.hrDrift,
+                    modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp),
+                )
+            }
+        }
+
+        // Aerobic Decoupling card (requires ≥ 20 min activity)
+        if (state.aerobicDecoupling != null && activity.durationSeconds >= 1200) {
+            item {
+                AerobicDecouplingCard(
+                    decoupling = state.aerobicDecoupling,
+                    modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp),
+                )
+            }
+        }
+
+        // HR Recovery card
+        if (state.hrRecovery != null && (state.hrRecovery.drop1Min != null || state.hrRecovery.drop2Min != null)) {
+            item {
+                HrRecoveryCard(
+                    recovery = state.hrRecovery,
+                    modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp),
+                )
             }
         }
 
@@ -270,9 +332,7 @@ private fun ActivityDetailContent(
         if (activity.type == ActivityType.RUNNING && state.racePredictions.isNotEmpty()) {
             item {
                 Column(modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp)) {
-                    RacePredictionsCard(
-                        predictions = state.racePredictions,
-                    )
+                    RacePredictionsCard(predictions = state.racePredictions)
                 }
             }
         }
@@ -281,9 +341,235 @@ private fun ActivityDetailContent(
         if (activity.laps.isNotEmpty()) {
             item {
                 Column(modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp)) {
-                    LapSplitsCard(
-                        laps = activity.laps,
-                        useImperial = state.useImperial,
+                    LapSplitsCard(laps = activity.laps, useImperial = state.useImperial)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ArtifactWarningBanner(
+    artifacts: ActivityHrAnalytics.ArtifactSpans,
+    modifier: Modifier = Modifier,
+) {
+    val count = artifacts.suspectTimestamps.size
+    val types = artifacts.reasons.values.toSet().joinToString(", ") { reason ->
+        when (reason) {
+            "spike" -> "spikes"
+            "flatline" -> "flatlines"
+            "dropout" -> "dropouts"
+            "cadence_lock" -> "cadence lock"
+            else -> reason
+        }
+    }
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(AmberAccent.copy(alpha = 0.12f))
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Icon(Icons.Filled.Warning, contentDescription = null, tint = AmberAccent, modifier = Modifier.size(18.dp))
+        Column {
+            Text(
+                "$count possible sensor artifact${if (count == 1) "" else "s"} in HR data",
+                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                color = AmberAccent,
+            )
+            if (types.isNotEmpty()) {
+                Text(types, style = MaterialTheme.typography.labelSmall, color = AmberAccent.copy(alpha = 0.8f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun HrZonesCard(
+    distribution: ActivityHrAnalytics.ZoneDistribution,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(CardDark)
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(
+            "Heart Rate Zones",
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = TextPrimary,
+        )
+        distribution.summaries.forEach { summary ->
+            HrZoneBar(summary = summary, showTime = true)
+        }
+    }
+}
+
+@Composable
+private fun HrDriftCard(
+    drift: ActivityHrAnalytics.HrDriftResult,
+    modifier: Modifier = Modifier,
+) {
+    val driftColor = when {
+        abs(drift.driftPercent) <= 5.0 -> TealPrimary
+        abs(drift.driftPercent) <= 10.0 -> AmberAccent
+        else -> CoralAccent
+    }
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(CardDark)
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            "Heart Rate Drift",
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = TextPrimary,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            SmallStatItem(
+                label = "1st half avg",
+                value = "${drift.firstHalfAvgBpm.toInt()} bpm",
+                modifier = Modifier.weight(1f),
+            )
+            SmallStatItem(
+                label = "2nd half avg",
+                value = "${drift.secondHalfAvgBpm.toInt()} bpm",
+                modifier = Modifier.weight(1f),
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Drift", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                val sign = if (drift.driftPercent > 0) "+" else ""
+                Text(
+                    "$sign${"%.1f".format(drift.driftPercent)}%",
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = driftColor,
+                )
+            }
+        }
+        Text(
+            "HR drift suggests possible fatigue, heat, or dehydration. Multiple factors may contribute.",
+            style = MaterialTheme.typography.bodySmall,
+            color = TextSecondary,
+        )
+    }
+}
+
+@Composable
+private fun AerobicDecouplingCard(
+    decoupling: ActivityHrAnalytics.AerobicDecouplingResult,
+    modifier: Modifier = Modifier,
+) {
+    val couplingColor = if (decoupling.isWellCoupled) TealPrimary else CoralAccent
+    val couplingLabel = if (decoupling.isWellCoupled) "Well coupled" else "Decoupled"
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(CardDark)
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            "Aerobic Decoupling (Pa:Hr)",
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = TextPrimary,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Decoupling", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                Text(
+                    "${"%.1f".format(decoupling.decouplingPercent)}%",
+                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                    color = couplingColor,
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(couplingColor.copy(alpha = 0.15f))
+                    .padding(horizontal = 10.dp, vertical = 4.dp)
+            ) {
+                Text(couplingLabel, style = MaterialTheme.typography.labelMedium, color = couplingColor)
+            }
+        }
+        decoupling.historicalDecouplingAvg?.let { histAvg ->
+            val delta = decoupling.decouplingPercent - histAvg
+            val sign = if (delta > 0) "+" else ""
+            Text(
+                "Your avg: ${"%.1f".format(histAvg)}%  ($sign${"%.1f".format(delta)}% today)",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary,
+            )
+        }
+        Text(
+            "< 5% suggests your aerobic fitness matches today's effort.",
+            style = MaterialTheme.typography.bodySmall,
+            color = TextSecondary,
+        )
+    }
+}
+
+@Composable
+private fun HrRecoveryCard(
+    recovery: ActivityHrAnalytics.HrRecoveryResult,
+    modifier: Modifier = Modifier,
+) {
+    fun dropColor(drop: Int?, threshold1: Int, threshold2: Int) = when {
+        drop == null -> TextSecondary
+        drop >= threshold2 -> TealPrimary
+        drop >= threshold1 -> AmberAccent
+        else -> TextSecondary
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(CardDark)
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(
+            "Heart Rate Recovery",
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = TextPrimary,
+        )
+        Text(
+            "Peak: ${recovery.peakBpm} bpm",
+            style = MaterialTheme.typography.bodySmall,
+            color = TextSecondary,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            listOf(
+                Triple("1 min", recovery.drop1Min, 15 to 20),
+                Triple("2 min", recovery.drop2Min, 22 to 30),
+                Triple("5 min", recovery.drop5Min, 40 to 50),
+            ).forEach { (label, drop, thresholds) ->
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(label, style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                    Text(
+                        if (drop != null) "−$drop bpm" else "--",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = dropColor(drop, thresholds.first, thresholds.second),
                     )
                 }
             }

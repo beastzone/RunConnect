@@ -31,7 +31,8 @@ Download the latest APK from the [Releases](https://github.com/beastzone/RunConn
   - **3D Mapbox map** with GPS route and terrain elevation (route loaded on-demand from Health Connect)
   - **Elevation profile chart** — with X/Y axis labels and touch scrubbing (altitude + distance tooltip)
   - **Pace chart** — with X/Y axis labels and touch scrubbing (pace tooltip)
-  - **Heart rate chart** — with X/Y axis labels and touch scrubbing (BPM tooltip)
+  - **Heart rate chart** — zone-band background (Z1–Z5), avg-HR dashed reference line, peak-HR marker, lap boundary lines with labels, artifact highlighting; touch scrubbing shows "152 bpm · Z3" tooltip
+  - **HR analysis cards** — Heart Rate Zones (time + % per zone), HR Drift (1st vs 2nd half avg, drift %, possible causes), Aerobic Decoupling (Pa:Hr % with well-coupled/decoupled badge, historical comparison), HR Recovery (1/2/5 min drop post-activity); artifact warning banner when sensor anomalies detected
   - Lap splits table
   - **Race predictions** via the Riegel formula (`T2 = T1 × (D2/D1)^1.06`) for 1 mi, 5K, 10K, half marathon, and full marathon
 
@@ -143,7 +144,7 @@ Download the latest APK from the [Releases](https://github.com/beastzone/RunConn
 | Maps | Mapbox Maps SDK v11 (3D terrain) |
 | Charts | Custom Canvas with touch scrubbing and axis labels (elevation, pace, HR, resting HR, HRV, weight, body fat, sleep stage timeline, overnight HR/HRV/SpO2/respiration) |
 | Networking | Retrofit + OkHttp + Moshi |
-| Storage | Room DB v1 (`runconnect_db`) + DataStore Preferences (`runconnect_prefs`, 18 keys) + WorkManager (background sync) |
+| Storage | Room DB v1 (`runconnect_db`) + DataStore Preferences (`runconnect_prefs`, 24 keys) + WorkManager (background sync) |
 | Race predictions | Riegel formula |
 | Insights | Rule-based engine (sleep, training load, recovery, consistency) |
 | HR Zone Models | % Max HR (default) and Heart Rate Reserve (HRR) — configurable in Settings |
@@ -184,7 +185,7 @@ File: `runconnect_db` · Schema exported to `app/schemas/`
 | `sleep_stages` | Sleep stage segments (FK → sleep_sessions, CASCADE) |
 | `sync_state` | Per-data-type HC change token + sync timestamps |
 
-### DataStore (`runconnect_prefs`, 18 keys)
+### DataStore (`runconnect_prefs`, 24 keys)
 
 Settings schema version: `1`
 
